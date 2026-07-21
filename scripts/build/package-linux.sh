@@ -138,6 +138,8 @@ mkdir -p "$RPM_DIR/SOURCES"
 mkdir -p "$RPM_DIR/SPECS"
 mkdir -p "$RPM_DIR/SRPMS"
 
+RPM_TOPDIR="$(cd "$RPM_DIR" && pwd)"
+
 # Create source tarball
 TARBALL="$RPM_DIR/SOURCES/lanos-$VERSION.tar.gz"
 tar -czf "$TARBALL" -C "$OUTPUT_DIR" "appimage/$APP_NAME.AppDir"
@@ -179,7 +181,7 @@ cp -a $APP_NAME.AppDir/usr/share/applications/* %{buildroot}/usr/share/applicati
 - Initial release
 EOF
 
-rpmbuild --define "_topdir $RPM_DIR" -bb "$RPM_DIR/SPECS/lanos.spec"
+rpmbuild --define "_topdir $RPM_TOPDIR" -bb "$RPM_DIR/SPECS/lanos.spec"
 cp "$RPM_DIR/RPMS/x86_64/lanos-$VERSION-1."*.rpm "$OUTPUT_DIR/" 2>/dev/null || true
 
 echo "Done. Packages in $OUTPUT_DIR/"
