@@ -44,13 +44,23 @@ class LifecycleControllerDesktop implements LifecycleController {
 
     _process!.stderr.drain<void>();
 
-    final handshakeLine = await _process!.stdout
-        .transform(utf8.decoder)
-        .transform(const LineSplitter())
-        .first
-        .timeout(const Duration(seconds: 5));
+    String? handshakeLine;
+    try {
+      handshakeLine = await _process!.stdout
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .first
+          .timeout(const Duration(seconds: 5));
+    } catch (e) {
+      throw StateError('gcd exited without handshake output');
+    }
 
     final json = jsonDecode(handshakeLine) as Map<String, dynamic>;
+
+    if (json['already_running'] == true) {
+      throw StateError('gcd already running (another instance holds the lock)');
+    }
+
     final port = json['port'] as int;
     final token = json['api_token'] as String;
     final version = json['version'] as String;

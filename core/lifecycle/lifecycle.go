@@ -73,9 +73,10 @@ func BindLocal(port int) (int, net.Listener, error) {
 
 // HandshakeMessage is the JSON payload emitted on stdout for Flutter.
 type HandshakeMessage struct {
-	Port     int    `json:"port"`
-	APIToken string `json:"api_token"`
-	Version  string `json:"version"`
+	Port          int    `json:"port"`
+	APIToken      string `json:"api_token"`
+	Version       string `json:"version"`
+	AlreadyRunning bool  `json:"already_running,omitempty"`
 }
 
 // EmitHandshake writes the startup handshake JSON line to stdout.
@@ -91,4 +92,16 @@ func EmitHandshake(port int, token, version string) error {
 		return fmt.Errorf("write handshake: %w", err)
 	}
 	return nil
+}
+
+// EmitHandshakeAlreadyRunning writes a handshake line indicating another
+// gcd instance is already running. Flutter uses this to show a user-friendly
+// error instead of "Bad state: No element".
+func EmitHandshakeAlreadyRunning(version string) {
+	msg := HandshakeMessage{Version: version, AlreadyRunning: true}
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return
+	}
+	os.Stdout.Write(append(data, '\n'))
 }

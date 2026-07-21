@@ -14,6 +14,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -52,6 +53,9 @@ func run() error {
 	// 1. Single-instance lock.
 	lock, err := instance.Acquire()
 	if err != nil {
+		if errors.Is(err, instance.ErrAlreadyRunning) {
+			lifecycle.EmitHandshakeAlreadyRunning(version)
+		}
 		return fmt.Errorf("acquire instance lock: %w", err)
 	}
 	defer lock.Release()
