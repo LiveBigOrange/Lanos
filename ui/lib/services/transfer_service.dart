@@ -54,7 +54,7 @@ class TransferItem {
       peer: peer,
       progress: progress ?? this.progress,
       error: error ?? this.error,
-      startedAt: startedAt ?? this.startedAt,
+      startedAt: startedAt,
     );
   }
 }

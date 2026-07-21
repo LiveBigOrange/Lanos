@@ -39,7 +39,7 @@ class SseClient {
       final resp = await req.close();
       _reconnectDelay = 500;
       String? currentEvent;
-      String? lastEventId;
+
       StringBuffer currentData = StringBuffer();
       _sub =
           resp.transform(utf8.decoder).transform(const LineSplitter()).listen(

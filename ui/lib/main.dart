@@ -148,7 +148,11 @@ class _LanosHomeState extends State<LanosHome> {
       case _LifecyclePhase.failed:
         return _ErrorScreen(error: _error ?? 'unknown error', onRetry: _boot);
       case _LifecyclePhase.ready:
-        return HomePage(api: _apiClient!, transferService: _transferService, deviceService: _deviceService);
+        return HomePage(
+          api: _apiClient!,
+          transferService: _transferService,
+          deviceService: _deviceService,
+        );
     }
   }
 }

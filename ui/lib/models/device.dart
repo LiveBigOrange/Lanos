@@ -97,7 +97,16 @@ class Device {
           hostname == other.hostname;
 
   @override
-  int get hashCode => Object.hash(id, name, port, pubHash, ipVersion, hostname, Object.hashAll(ipv4), Object.hashAll(ipv6));
+  int get hashCode => Object.hash(
+    id,
+    name,
+    port,
+    pubHash,
+    ipVersion,
+    hostname,
+    Object.hashAll(ipv4),
+    Object.hashAll(ipv6),
+  );
 
   static bool _listEq(List<String> a, List<String> b) {
     if (a.length != b.length) return false;

@@ -18,7 +18,12 @@ import 'transfer_page.dart';
 /// the device list to SSE for real-time updates; the send-file flow lands
 /// in P1 W4.
 class HomePage extends StatefulWidget {
-  const HomePage({super.key, required this.api, this.transferService, this.deviceService});
+  const HomePage({
+    super.key,
+    required this.api,
+    this.transferService,
+    this.deviceService,
+  });
 
   final ApiClient api;
 

@@ -8,6 +8,8 @@
 ///
 /// The clock is injectable via [now] so tests can drive time deterministically
 /// without `Future.delayed`.
+library;
+
 import 'dart:collection';
 
 class TransferStats {
