@@ -37,6 +37,7 @@ class TransferProgressCard extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final isOutgoing = item.direction == TransferDirection.outgoing;
     final isActive = item.status == TransferStatus.pending ||
+        item.status == TransferStatus.connecting ||
         item.status == TransferStatus.transferring;
 
     return Card(
@@ -201,6 +202,11 @@ class TransferProgressCard extends StatelessWidget {
           cs.onSurfaceVariant,
           cs.surfaceContainerHighest
         ),
+      TransferStatus.connecting => (
+          l10n.statusWaiting,
+          cs.onSurfaceVariant,
+          cs.surfaceContainerHighest
+        ),
       TransferStatus.transferring => (
           l10n.statusTransferring,
           cs.onPrimaryContainer,
@@ -218,6 +224,11 @@ class TransferProgressCard extends StatelessWidget {
         ),
       TransferStatus.cancelled => (
           l10n.statusCancelled,
+          cs.onSurfaceVariant,
+          cs.surfaceContainerHighest
+        ),
+      TransferStatus.awaitingResume => (
+          l10n.statusWaiting,
           cs.onSurfaceVariant,
           cs.surfaceContainerHighest
         ),
