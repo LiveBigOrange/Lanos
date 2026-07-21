@@ -73,10 +73,10 @@ func BindLocal(port int) (int, net.Listener, error) {
 
 // HandshakeMessage is the JSON payload emitted on stdout for Flutter.
 type HandshakeMessage struct {
-	Port          int    `json:"port"`
-	APIToken      string `json:"api_token"`
-	Version       string `json:"version"`
-	AlreadyRunning bool  `json:"already_running,omitempty"`
+	Port           int    `json:"port"`
+	APIToken       string `json:"api_token"`
+	Version        string `json:"version"`
+	AlreadyRunning bool   `json:"already_running,omitempty"`
 }
 
 // EmitHandshake writes the startup handshake JSON line to stdout.
