@@ -16,8 +16,7 @@ jobs:
         include:
           - { os: ubuntu-22.04, target: linux-amd64,  goos: linux,   goarch: amd64 }
           - { os: ubuntu-22.04, target: linux-arm64,  goos: linux,   goarch: arm64 }
-          - { os: macos-13,     target: darwin-arm64, goos: darwin,  goarch: arm64 }
-          - { os: macos-13,     target: darwin-amd64, goos: darwin,  goarch: amd64 }
+
           - { os: windows-2022, target: windows-amd64, goos: windows, goarch: amd64 }
     runs-on: ${{ matrix.os }}
     defaults:
