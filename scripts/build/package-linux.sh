@@ -36,8 +36,8 @@ cp -R ../../ui/build/linux/x64/release/bundle/* "$APPDIR/usr/bin/"
 # Copy Go core
 cp ../../core/gcd "$APPDIR/usr/bin/"
 
-# Create desktop file
-cat > "$APPDIR/usr/share/applications/$APP_NAME.desktop" << EOF
+# Create desktop file (AppImage requires it in AppDir root)
+cat > "$APPDIR/$APP_NAME.desktop" << EOF
 [Desktop Entry]
 Name=Lanos
 Comment=Local network file sharing
@@ -47,6 +47,7 @@ Type=Application
 Categories=Network;FileTransfer;
 MimeType=x-scheme-handler/lanos;
 EOF
+cp "$APPDIR/$APP_NAME.desktop" "$APPDIR/usr/share/applications/$APP_NAME.desktop"
 
 # Create AppRun
 cat > "$APPDIR/AppRun" << 'EOF'
