@@ -76,6 +76,9 @@ Name: "{autodesktop}\Lanos"; Filename: "{app}\lanos.exe"; Tasks: desktopicon
 [Run]
 Filename: "{app}\lanos.exe"; Description: "{cm:LaunchProgram,Lanos}"; Flags: nowait postinstall skipifsilent
 
+[UninstallRun]
+Filename: "taskkill.exe"; Parameters: "/F /IM gcd.exe"; Flags: runhidden; RunOnceId: "KillGcd"
+
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}"
 "@
