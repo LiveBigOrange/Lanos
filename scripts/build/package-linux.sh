@@ -6,15 +6,15 @@ VERSION="${1:-0.1.0}"
 OUTPUT_DIR="dist"
 APP_NAME="lanos"
 
+SKIP_BUILD="${2:-}"
 echo "Building Lanos Linux packages v$VERSION"
 
-# Build Flutter Linux
-cd "$(dirname "$0")/../../ui"
-flutter build linux --release
-
-# Build Go core (static)
-cd ../core
-CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o gcd ./cmd/gcd
+if [ -z "$SKIP_BUILD" ]; then
+    cd "$(dirname "$0")/../../ui"
+    flutter build linux --release
+    cd ../core
+    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o gcd ./cmd/gcd
+fi
 
 cd ../scripts/build
 mkdir -p "$OUTPUT_DIR"

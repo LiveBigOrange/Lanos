@@ -66,11 +66,9 @@ jobs:
       - name: Package with Inno Setup
         working-directory: scripts/build
         run: |
-          # Install Inno Setup via chocolatey
           choco install innosetup --no-progress -y
-          # Refresh PATH
           $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
-          ./package-windows.ps1 -Version "${{ github.ref_name }}"
+          ./package-windows.ps1 -Version "${{ github.ref_name }}" -SkipBuild
       - uses: actions/upload-artifact@v4
         with:
           name: windows-installer
@@ -99,7 +97,7 @@ jobs:
           lipo -create -output gcd gcd-amd64 gcd-arm64
       - name: Package DMG
         working-directory: scripts/build
-        run: ./package-macos.sh "${{ github.ref_name }}"
+        run: ./package-macos.sh "${{ github.ref_name }}" skip-build
       - uses: actions/upload-artifact@v4
         with:
           name: macos-dmg
@@ -129,7 +127,7 @@ jobs:
         run: CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o gcd ./cmd/gcd
       - name: Package Linux
         working-directory: scripts/build
-        run: ./package-linux.sh "${{ github.ref_name }}"
+        run: ./package-linux.sh "${{ github.ref_name }}" skip-build
       - uses: actions/upload-artifact@v4
         with:
           name: linux-packages

@@ -7,18 +7,18 @@ OUTPUT_DIR="dist"
 APP_NAME="Lanos"
 BUNDLE_ID="com.lanos.lanos"
 
+SKIP_BUILD="${2:-}"
 echo "Building Lanos macOS installer v$VERSION"
 
-# Build Flutter macOS (universal)
-cd "$(dirname "$0")/../../ui"
-flutter build macos --release
-
-# Build Go core (universal)
-cd ../core
-GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o gcd-amd64 ./cmd/gcd
-GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o gcd-arm64 ./cmd/gcd
-lipo -create -output gcd gcd-amd64 gcd-arm64
-rm gcd-amd64 gcd-arm64
+if [ -z "$SKIP_BUILD" ]; then
+    cd "$(dirname "$0")/../../ui"
+    flutter build macos --release
+    cd ../core
+    GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o gcd-amd64 ./cmd/gcd
+    GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o gcd-arm64 ./cmd/gcd
+    lipo -create -output gcd gcd-amd64 gcd-arm64
+    rm gcd-amd64 gcd-arm64
+fi
 
 # Create output directory
 cd ../scripts/build

@@ -2,20 +2,20 @@
 # Requires: Inno Setup 6 (iscc.exe in PATH)
 param(
     [string]$Version = "0.1.0",
-    [string]$OutputDir = "dist"
+    [string]$OutputDir = "dist",
+    [switch]$SkipBuild = $false
 )
 
 $ErrorActionPreference = "Stop"
 
 Write-Host "Building Lanos Windows installer v$Version"
 
-# Build Flutter Windows
-Set-Location "$PSScriptRoot/../../ui"
-flutter build windows --release
-
-# Build Go core
-Set-Location "$PSScriptRoot/../../core"
-go build -trimpath -ldflags="-s -w" -o gcd.exe ./cmd/gcd
+if (-not $SkipBuild) {
+    Set-Location "$PSScriptRoot/../../ui"
+    flutter build windows --release
+    Set-Location "$PSScriptRoot/../../core"
+    go build -trimpath -ldflags="-s -w" -o gcd.exe ./cmd/gcd
+}
 
 # Create output directory
 Set-Location $PSScriptRoot
