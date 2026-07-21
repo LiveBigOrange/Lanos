@@ -31,6 +31,11 @@ ui/windows/flutter/ephemeral/
 .DS_Store
 Thumbs.db
 
+# CodeArts / AI agent
+.arts/
+.codeartsdoer/
+AGENTS.md
+
 # gomobile build outputs
 mobile/dist/
 mobile/bind/lanos.aar
