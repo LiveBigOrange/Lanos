@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build-core:
+    name: Build gcd (${{ matrix.os }}/${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-22.04, target: linux-amd64,  goos: linux,   goarch: amd64 }
+          - { os: ubuntu-22.04, target: linux-arm64,  goos: linux,   goarch: arm64 }
+          - { os: macos-13,     target: darwin-arm64, goos: darwin,  goarch: arm64 }
+          - { os: macos-13,     target: darwin-amd64, goos: darwin,  goarch: amd64 }
+          - { os: windows-2022, target: windows-amd64, goos: windows, goarch: amd64 }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache-dependency-path: core/go.sum
+      - name: Build gcd
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          ext=""
+          if [ "$GOOS" = "windows" ]; then ext=".exe"; fi
+          go build -trimpath -ldflags="-s -w" -o gcd${ext} ./cmd/gcd
+          mkdir -p out
+          tar -czf out/gcd-${{ matrix.target }}.tar.gz gcd${ext}
+        shell: bash
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gcd-${{ matrix.target }}
+          path: core/out/gcd-${{ matrix.target }}.tar.gz
+
+  # TODO P2 W8: build Flutter desktop installers (exe/dmg/AppImage/deb/rpm)
+  # TODO P4 W16: build mobile packages (apk/aab/ipa)
+  # TODO P4 W16: assemble GitHub Release with all artifacts + checksums

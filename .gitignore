@@ -1,0 +1,51 @@
+# Go
+core/bin/
+core/dist/
+core/gcd
+core/gcd.exe
+*.test
+*.out
+core/coverage.*
+
+# Flutter / Dart
+ui/.dart_tool/
+ui/.flutter-plugins
+ui/.flutter-plugins-dependencies
+ui/.packages
+ui/build/
+ui/.metadata
+ui/ios/Pods/
+ui/android/.gradle/
+ui/android/app/build/
+ui/android/build/
+ui/macos/Pods/
+ui/macos/Flutter/ephemeral/
+ui/linux/flutter/ephemeral/
+ui/windows/flutter/ephemeral/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.swp
+.DS_Store
+Thumbs.db
+
+# gomobile build outputs
+mobile/dist/
+mobile/bind/lanos.aar
+mobile/bind/Lanos.xcframework/
+
+# User data (runtime artifacts when running locally)
+*.lanos.log
+transfer_cache/
+transfer_meta/
+transfer_log.db
+transfer_log.db-*
+config.yaml
+identity.key
+trusted_devices.json
+
+# Release artifacts
+dist/
+release/

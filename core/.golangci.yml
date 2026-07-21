@@ -1,0 +1,29 @@
+run:
+  timeout: 5m
+  go: "1.22"
+
+linters:
+  enable:
+    - errcheck
+    - revive
+    - gosec
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - typecheck
+    - unused
+    - misspell
+
+linters-settings:
+  gosec:
+    excludes:
+      - G104  # unhandled error (errcheck already covers)
+  revive:
+    severity: warning
+
+issues:
+  exclude-dirs:
+    - vendor
+  max-issues-per-linter: 0
+  max-same-issues: 0
