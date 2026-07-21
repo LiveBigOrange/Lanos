@@ -168,8 +168,8 @@ for local networks.
 rm -rf %{buildroot}
 mkdir -p %{buildroot}/usr/bin
 mkdir -p %{buildroot}/usr/share/applications
-cp -a $APP_NAME.AppDir/usr/bin/* %{buildroot}/usr/bin/
-cp -a $APP_NAME.AppDir/usr/share/applications/* %{buildroot}/usr/share/applications/
+cp -a appimage/$APP_NAME.AppDir/usr/bin/* %{buildroot}/usr/bin/
+cp -a appimage/$APP_NAME.AppDir/usr/share/applications/* %{buildroot}/usr/share/applications/
 
 %files
 /usr/bin/lanos
