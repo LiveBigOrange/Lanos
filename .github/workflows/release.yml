@@ -57,6 +57,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.22"
+          cache-dependency-path: core/go.sum
       - name: Build Flutter Windows
         working-directory: ui
         run: flutter build windows --release
@@ -86,6 +87,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.22"
+          cache-dependency-path: core/go.sum
       - name: Build Flutter macOS
         working-directory: ui
         run: flutter build macos --release
@@ -114,6 +116,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.22"
+          cache-dependency-path: core/go.sum
       - name: Install dependencies
         run: |
           sudo apt-get update
