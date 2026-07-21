@@ -76,7 +76,7 @@ jobs:
 
   build-macos:
     name: Build macOS DMG
-
+    if: false
     runs-on: macos-13
     steps:
       - uses: actions/checkout@v4
@@ -141,7 +141,7 @@ jobs:
 
   release:
     name: Create GitHub Release
-    needs: [build-core, build-windows, build-macos, build-linux]
+    needs: [build-core, build-windows, build-linux]
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
