@@ -43,7 +43,7 @@ DefaultDirName={autopf}\Lanos
 DefaultGroupName=Lanos
 OutputDir=$OutputDir
 OutputBaseFilename=Lanos-Setup-$Version
-SetupIconFile=$staging\app\data\flutter_assets\assets\icon.ico
+
 Compression=lzma2/max
 SolidCompression=yes
 PrivilegesRequired=admin

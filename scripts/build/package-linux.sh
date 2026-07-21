@@ -9,14 +9,17 @@ APP_NAME="lanos"
 SKIP_BUILD="${2:-}"
 echo "Building Lanos Linux packages v$VERSION"
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
 if [ -z "$SKIP_BUILD" ]; then
-    cd "$(dirname "$0")/../../ui"
+    cd "$PROJECT_ROOT/ui"
     flutter build linux --release
-    cd ../core
+    cd "$PROJECT_ROOT/core"
     CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o gcd ./cmd/gcd
 fi
 
-cd ../scripts/build
+cd "$SCRIPT_DIR"
 mkdir -p "$OUTPUT_DIR"
 
 # --- AppImage ---
