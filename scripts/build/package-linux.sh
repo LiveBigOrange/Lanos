@@ -3,6 +3,7 @@
 set -euo pipefail
 
 VERSION="${1:-0.1.0}"
+VERSION="${VERSION#v}"
 OUTPUT_DIR="dist"
 APP_NAME="lanos"
 

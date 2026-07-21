@@ -6,6 +6,8 @@
 
 $ErrorActionPreference = "Stop"
 
+$Version = $Version -replace '^v', ''
+
 Write-Host "Building Lanos Windows installer v$Version"
 
 $ProjectRoot = Resolve-Path "$PSScriptRoot/../.."
@@ -22,7 +24,7 @@ if (-not $SkipBuild) {
 Set-Location $PSScriptRoot
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 
-$staging = "$OutputDir/staging"
+$staging = (Resolve-Path "$OutputDir/staging").Path
 if (Test-Path $staging) { Remove-Item -Recurse -Force $staging }
 New-Item -ItemType Directory -Force -Path "$staging/app" | Out-Null
 New-Item -ItemType Directory -Force -Path "$staging/core" | Out-Null
