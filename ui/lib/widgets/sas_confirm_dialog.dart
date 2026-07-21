@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../l10n/app_localizations.dart';
+
 /// A dialog that shows the 4-digit SAS (Short Authentication String) code for
 /// the user to visually compare with the peer device's display, then confirm
 /// or cancel the pairing.
@@ -84,71 +86,72 @@ class _SasConfirmDialogState extends State<SasConfirmDialog> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final urgent = _remaining <= 5;
-    return PopScope(
-      canPop: false,
-      child: AlertDialog(
-        title: const Text('确认配对'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '请与 "${widget.deviceName}" 核对以下数字是否一致，',
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              '一致后点击"确认"以建立加密连接。',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              widget.sasCode,
-              style: TextStyle(
-                fontSize: 56,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 12,
-                color: theme.colorScheme.primary,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  urgent ? Icons.timer_off : Icons.timer,
-                  size: 16,
-                  color: urgent ? theme.colorScheme.error : theme.colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  '$_remaining 秒后自动取消',
-                  style: TextStyle(
-                    color: urgent ? theme.colorScheme.error : theme.colorScheme.onSurfaceVariant,
-                    fontWeight: urgent ? FontWeight.bold : FontWeight.normal,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              widget.onCancel?.call();
-              _close();
-            },
-            child: const Text('取消'),
+    return AlertDialog(
+      title: Text(AppLocalizations.of(context)!.sasConfirmTitle),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            AppLocalizations.of(context)!.sasVerifyPrompt(widget.deviceName),
+            textAlign: TextAlign.center,
           ),
-          FilledButton(
-            onPressed: () {
-              widget.onConfirm?.call();
-              _close();
-            },
-            child: const Text('确认'),
+          const SizedBox(height: 4),
+          Text(
+            AppLocalizations.of(context)!.sasVerifyHint,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 13),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            widget.sasCode,
+            style: TextStyle(
+              fontSize: 56,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 12,
+              color: theme.colorScheme.primary,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                urgent ? Icons.timer_off : Icons.timer,
+                size: 16,
+                color: urgent
+                    ? theme.colorScheme.error
+                    : theme.colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                AppLocalizations.of(context)!.sasAutoCancel(_remaining),
+                style: TextStyle(
+                  color: urgent
+                      ? theme.colorScheme.error
+                      : theme.colorScheme.onSurfaceVariant,
+                  fontWeight: urgent ? FontWeight.bold : FontWeight.normal,
+                ),
+              ),
+            ],
           ),
         ],
       ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            widget.onCancel?.call();
+            _close();
+          },
+          child: Text(AppLocalizations.of(context)!.cancel),
+        ),
+        FilledButton(
+          onPressed: () {
+            widget.onConfirm?.call();
+            _close();
+          },
+          child: Text(AppLocalizations.of(context)!.confirm),
+        ),
+      ],
     );
   }
 }

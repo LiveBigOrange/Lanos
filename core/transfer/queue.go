@@ -19,8 +19,8 @@ import (
 type Direction int
 
 const (
-	DirectionUpload Direction = iota // local -> peer (we are the sender)
-	DirectionDownload               // peer -> local (we are the receiver)
+	DirectionUpload   Direction = iota // local -> peer (we are the sender)
+	DirectionDownload                  // peer -> local (we are the receiver)
 )
 
 // String returns a human-readable direction name.
@@ -50,8 +50,8 @@ type TaskFunc func(ctx context.Context) error
 
 // Task is a queued transfer operation.
 type Task struct {
-	ID        string   // transfer ID (matches Manager.Transfer.ID)
-	PeerID    string   // target device ID
+	ID        string // transfer ID (matches Manager.Transfer.ID)
+	PeerID    string // target device ID
 	Direction Direction
 	Execute   TaskFunc
 }
@@ -146,6 +146,7 @@ func (q *Queue) Enqueue(t *Task) error {
 		q.devices[t.PeerID] = dq
 	}
 	dq.pending = append(dq.pending, t)
+	q.wg.Add(1) // Add at enqueue time so it always happens-before any Wait()
 	q.mu.Unlock()
 	q.cond.Signal()
 	return nil
@@ -218,8 +219,8 @@ func (q *Queue) popRunnableLocked() *Task {
 }
 
 // runTask executes a task in a goroutine, freeing its slot on completion.
+// wg.Add(1) was called at Enqueue time; here we only Done.
 func (q *Queue) runTask(t *Task) {
-	q.wg.Add(1)
 	go func() {
 		defer q.wg.Done()
 		defer q.releaseSlot(t)
@@ -279,8 +280,9 @@ func (q *Queue) Wait() {
 	q.wg.Wait()
 }
 
-// Close stops accepting new tasks and cancels in-flight ones. Pending tasks
-// are abandoned. Use Wait to drain in-flight tasks.
+// Close stops accepting new tasks and cancels in-flight ones. Pending (never
+// dispatched) tasks are abandoned; their WaitGroup counters are released so
+// Wait() does not deadlock. Use Wait to drain in-flight tasks.
 func (q *Queue) Close() {
 	q.mu.Lock()
 	if q.closed {
@@ -288,7 +290,16 @@ func (q *Queue) Close() {
 		return
 	}
 	q.closed = true
+	// Release WaitGroup counters for pending tasks that will never run.
+	pendingCount := 0
+	for _, dq := range q.devices {
+		pendingCount += len(dq.pending)
+		dq.pending = nil
+	}
 	q.mu.Unlock()
 	q.cond.Broadcast()
 	q.cancel()
+	if pendingCount > 0 {
+		q.wg.Add(-pendingCount)
+	}
 }

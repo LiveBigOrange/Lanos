@@ -42,7 +42,8 @@ class LifecycleControllerDesktop implements LifecycleController {
       mode: ProcessStartMode.normal,
     );
 
-    // Read the first stdout line within 5 seconds.
+    _process!.stderr.drain<void>();
+
     final handshakeLine = await _process!.stdout
         .transform(utf8.decoder)
         .transform(const LineSplitter())
@@ -72,8 +73,28 @@ class LifecycleControllerDesktop implements LifecycleController {
   }
 
   Future<String?> _resolveGcdPath() async {
-    // TODO P0 W1: bundle gcd in build output and resolve relative to the
-    // executable directory. For now, expect it on PATH.
+    // 1. Environment variable override.
+    final envPath = Platform.environment['LANOS_GCD_PATH'];
+    if (envPath != null && envPath.isNotEmpty) {
+      if (await File(envPath).exists()) return envPath;
+    }
+
+    // 2. Relative to the Flutter executable directory.
+    try {
+      final exeDir = File(Platform.resolvedExecutable).parent.path;
+      final candidate = Platform.isWindows ? '$exeDir\\gcd.exe' : '$exeDir/gcd';
+      if (await File(candidate).exists()) return candidate;
+    } catch (_) {}
+
+    // 3. Common installation paths (Linux/macOS).
+    if (!Platform.isWindows) {
+      for (final dir in ['/usr/local/bin', '/opt/homebrew/bin', '/usr/bin']) {
+        final candidate = '$dir/gcd';
+        if (await File(candidate).exists()) return candidate;
+      }
+    }
+
+    // 4. Fallback to PATH.
     return Platform.isWindows ? 'gcd.exe' : 'gcd';
   }
 }

@@ -20,15 +20,19 @@ var ErrIPBanned = errors.New("share: IP temporarily banned")
 
 // Manager tracks active shares, enforces limits, and handles IP banning.
 type Manager struct {
-	mu       sync.RWMutex
-	shares   map[string]*Share // token -> share
+	mu        sync.RWMutex
+	shares    map[string]*Share // token -> share
 	maxShares int
 
 	// IP ban tracking
-	banMu      sync.Mutex
-	tokenFails map[string]int // IP -> failed token attempts
-	passFails  map[string]int // IP -> failed password attempts
+	banMu       sync.Mutex
+	tokenFails  map[string]int       // IP -> failed token attempts
+	passFails   map[string]int       // IP -> failed password attempts
 	bannedUntil map[string]time.Time // IP -> ban expiry
+
+	// Lifecycle
+	stop     chan struct{}
+	stopOnce sync.Once
 }
 
 // NewManager creates a share manager with the given concurrency limit.
@@ -42,10 +46,19 @@ func NewManager(maxShares int) *Manager {
 		tokenFails:  make(map[string]int),
 		passFails:   make(map[string]int),
 		bannedUntil: make(map[string]time.Time),
+		stop:        make(chan struct{}),
 	}
 	// Background cleanup goroutine
 	go m.cleanupLoop()
 	return m
+}
+
+// Stop terminates the background cleanup goroutine. Safe to call multiple
+// times; subsequent calls are no-ops. Does NOT touch active shares — call
+// StopAll separately if you need to release them. Always call Stop (or
+// the process will leak the goroutine until exit, which breaks tests).
+func (m *Manager) Stop() {
+	m.stopOnce.Do(func() { close(m.stop) })
 }
 
 // CreateShare registers a new share. Returns ErrShareLimit if at capacity.
@@ -98,11 +111,12 @@ func (m *Manager) StopShare(token string) bool {
 func (m *Manager) StopAll() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	count := len(m.shares)
 	for token, s := range m.shares {
 		s.Stopped = true
 		delete(m.shares, token)
 	}
-	slog.Info("all shares stopped", "count", len(m.shares))
+	slog.Info("all shares stopped", "count", count)
 }
 
 // ListShares returns a snapshot of all active shares.
@@ -209,8 +223,13 @@ func (m *Manager) clearPassFails(ip string) {
 func (m *Manager) cleanupLoop() {
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
-	for range ticker.C {
-		m.cleanup()
+	for {
+		select {
+		case <-m.stop:
+			return
+		case <-ticker.C:
+			m.cleanup()
+		}
 	}
 }
 

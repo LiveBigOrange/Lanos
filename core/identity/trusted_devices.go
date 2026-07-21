@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 )
 
@@ -54,7 +55,14 @@ const trustedFileName = "trusted_devices.json"
 var ErrTrustStoreCorrupt = errors.New("identity: trusted_devices.json is corrupt")
 
 // TrustStore reads and writes trusted_devices.json.
+//
+// All public methods acquire mu for the full load/edit/save sequence. This
+// prevents the lost-update TOCTOU that two concurrent Trust() calls would
+// otherwise hit (A load -> B load -> A save -> B save overwrites A). The
+// store is touched rarely (a few times per session), so a plain Mutex is
+// fine; no need for RWMutex and its reentrancy footguns.
 type TrustStore struct {
+	mu   sync.Mutex
 	path string
 }
 
@@ -130,6 +138,15 @@ func (s *TrustStore) save(m map[string]TrustedDevice) error {
 // Lookup returns the trusted device record for deviceID (16 hex chars = first
 // 8 bytes of SHA256(pubkey)) and whether it existed.
 func (s *TrustStore) Lookup(deviceID string) (TrustedDevice, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.lookupLocked(deviceID)
+}
+
+// lookupLocked is the inner, unlocked helper. Caller MUST hold s.mu; this is
+// used by VerifyPeer to avoid re-acquiring the (non-reentrant) Mutex via a
+// public Lookup call.
+func (s *TrustStore) lookupLocked(deviceID string) (TrustedDevice, bool, error) {
 	m, err := s.load()
 	if err != nil {
 		return TrustedDevice{}, false, err
@@ -146,6 +163,8 @@ func (s *TrustStore) Trust(deviceID string, staticKey []byte, edPubKey []byte, n
 	if len(staticKey) != 32 {
 		return fmt.Errorf("identity: static key must be 32 bytes, got %d", len(staticKey))
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	m, err := s.load()
 	if err != nil {
 		return err
@@ -166,6 +185,8 @@ func (s *TrustStore) Trust(deviceID string, staticKey []byte, edPubKey []byte, n
 // Remove deletes a trusted device record. Removing a non-existent entry is not
 // an error.
 func (s *TrustStore) Remove(deviceID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	m, err := s.load()
 	if err != nil {
 		return err
@@ -185,7 +206,9 @@ func (s *TrustStore) Remove(deviceID string) error {
 //   - PeerTrusted:     static key matches -> skip SAS
 //   - PeerKeyMismatch: record exists but key differs -> downgrade, re-run SAS
 func (s *TrustStore) VerifyPeer(deviceID string, peerX25519Static []byte) (PeerVerification, TrustedDevice, error) {
-	td, ok, err := s.Lookup(deviceID)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	td, ok, err := s.lookupLocked(deviceID)
 	if err != nil {
 		return PeerUnknown, TrustedDevice{}, err
 	}
@@ -221,5 +244,7 @@ func equalBytes(a, b []byte) bool {
 
 // List returns all trusted devices keyed by device ID.
 func (s *TrustStore) List() (map[string]TrustedDevice, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	return s.load()
 }

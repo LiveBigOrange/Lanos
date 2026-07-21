@@ -1,0 +1,13 @@
+[Desktop Entry]
+Name=Lanos
+Comment=Local network file sharing
+Comment[zh_CN]=局域网文件共享
+Exec=lanos %U
+Icon=lanos
+Type=Application
+Categories=Network;FileTransfer;Utility;
+MimeType=x-scheme-handler/lanos;
+Keywords=share;file;transfer;lan;local;network;
+Keywords[zh_CN]=共享;文件;传输;局域网;
+StartupNotify=true
+StartupWMClass=Lanos

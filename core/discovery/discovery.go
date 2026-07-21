@@ -65,6 +65,7 @@ type Discovery struct {
 	cancel   context.CancelFunc
 	closed   chan struct{}
 	stopOnce sync.Once
+	wg       sync.WaitGroup // tracks consumeEntries + runReaper + newProber.run
 }
 
 // New constructs a Discovery. Does not start any network activity yet.
@@ -140,9 +141,21 @@ func (d *Discovery) Start() error {
 		return fmt.Errorf("resolver browse: %w", err)
 	}
 
-	go d.consumeEntries(entries)
-	go d.runReaper(ctx)
-	go newProber(d).run(ctx)
+	d.wg.Add(1)
+	go func() {
+		defer d.wg.Done()
+		d.consumeEntries(entries)
+	}()
+	d.wg.Add(1)
+	go func() {
+		defer d.wg.Done()
+		d.runReaper(ctx)
+	}()
+	d.wg.Add(1)
+	go func() {
+		defer d.wg.Done()
+		newProber(d).run(ctx)
+	}()
 
 	d.log.Info("discovery started",
 		"device_name", d.cfg.DeviceName,
@@ -360,12 +373,14 @@ func (d *Discovery) Stop() error {
 			d.server.Shutdown()
 			d.server = nil
 		}
-		// Wait for the consumer goroutine to drain the entries channel. The
-		// resolver closes the channel after Browse's context is cancelled.
-		select {
-		case <-d.closed:
-		case <-time.After(2 * time.Second):
-		}
+		// Wait for ALL worker goroutines (consumeEntries, runReaper,
+		// newProber.run) to exit before closing the events channel. If we
+		// close d.events while a reaper/prober is still running, its next
+		// `d.events <- ev` would panic on send-to-closed-channel. The
+		// resolver closes the entries channel after Browse's ctx is
+		// cancelled, which in turn unblocks consumeEntries, so this wait
+		// is bounded by zeroconf's shutdown path.
+		d.wg.Wait()
 		close(d.events)
 	})
 	return nil

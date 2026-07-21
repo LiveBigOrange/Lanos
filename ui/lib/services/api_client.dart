@@ -21,19 +21,42 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> get(String path) async {
-    final req = await HttpClient().getUrl(_uri(path));
+    final req = await http.getUrl(_uri(path));
     _attachAuth(req, path);
     final resp = await req.close();
     return _decode(resp);
   }
 
-  Future<Map<String, dynamic>> post(String path, [Map<String, dynamic>? body]) async {
-    final req = await HttpClient().postUrl(_uri(path));
+  /// Like [get] but returns the raw response body as a String.
+  /// Useful for endpoints that return non-JSON content (e.g. CSV export).
+  Future<String> getRaw(String path) async {
+    final req = await http.getUrl(_uri(path));
+    _attachAuth(req, path);
+    final resp = await req.close();
+    final body = await resp.transform(utf8.decoder).join();
+    if (resp.statusCode < 200 || resp.statusCode >= 300) {
+      throw ApiException(resp.statusCode, body);
+    }
+    return body;
+  }
+
+  Future<Map<String, dynamic>> post(
+    String path, [
+    Map<String, dynamic>? body,
+  ]) async {
+    final req = await http.postUrl(_uri(path));
     _attachAuth(req, path);
     if (body != null) {
       req.headers.contentType = ContentType.json;
       req.add(utf8.encode(jsonEncode(body)));
     }
+    final resp = await req.close();
+    return _decode(resp);
+  }
+
+  Future<Map<String, dynamic>> delete(String path) async {
+    final req = await http.deleteUrl(_uri(path));
+    _attachAuth(req, path);
     final resp = await req.close();
     return _decode(resp);
   }

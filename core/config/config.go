@@ -5,8 +5,11 @@ package config
 import (
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
+	"reflect"
+	"strings"
 	"sync"
 
 	"gopkg.in/yaml.v3"
@@ -115,10 +118,101 @@ func (c *Config) DataDir() (string, error) {
 	return dataDir()
 }
 
+// Apply sets multiple fields from a map keyed by yaml tag and persists.
+// Unknown or unexported fields are silently skipped. Type conversions
+// follow JSON decoding conventions (float64->int for numeric fields).
+func (c *Config) Apply(updates map[string]interface{}) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	cfgType := reflect.TypeOf(c).Elem()
+	cfgVal := reflect.ValueOf(c).Elem()
+
+	for i := 0; i < cfgType.NumField(); i++ {
+		f := cfgType.Field(i)
+		tag := f.Tag.Get("yaml")
+		if tag == "" || tag == "-" {
+			continue
+		}
+		if idx := strings.Index(tag, ","); idx != -1 {
+			tag = tag[:idx]
+		}
+		val, ok := updates[tag]
+		if !ok {
+			continue
+		}
+		field := cfgVal.Field(i)
+		if !field.CanSet() {
+			continue
+		}
+		rv := reflect.ValueOf(val)
+		switch field.Kind() {
+		case reflect.String:
+			if rv.Kind() == reflect.String {
+				field.SetString(rv.String())
+			}
+		case reflect.Bool:
+			if rv.Kind() == reflect.Bool {
+				field.SetBool(rv.Bool())
+			}
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			switch rv.Kind() {
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+				field.SetInt(rv.Int())
+			case reflect.Float32, reflect.Float64:
+				f := rv.Float()
+				if math.IsNaN(f) || math.IsInf(f, 0) {
+					continue
+				}
+				field.SetInt(int64(f))
+			}
+		case reflect.Float32, reflect.Float64:
+			switch rv.Kind() {
+			case reflect.Float32, reflect.Float64:
+				f := rv.Float()
+				if math.IsNaN(f) || math.IsInf(f, 0) {
+					continue
+				}
+				field.SetFloat(f)
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+				field.SetFloat(float64(rv.Int()))
+			}
+		}
+	}
+
+	if err := c.validateLocked(); err != nil {
+		return err
+	}
+
+	return c.Save()
+}
+
+func (c *Config) validateLocked() error {
+	if c.DeviceName == "" {
+		return fmt.Errorf("config: device_name must not be empty")
+	}
+	if c.Port != 0 && (c.Port < 1024 || c.Port > 65535) {
+		return fmt.Errorf("config: port must be 0 or in range 1024-65535, got %d", c.Port)
+	}
+	if c.MaxActiveShares < 16 || c.MaxActiveShares > 256 {
+		return fmt.Errorf("config: max_active_shares must be 16-256, got %d", c.MaxActiveShares)
+	}
+	switch c.AutoReceive {
+	case "", "ask", "trusted", "all":
+	default:
+		return fmt.Errorf("config: auto_receive must be ask/trusted/all, got %q", c.AutoReceive)
+	}
+	return nil
+}
+
 // SetDeviceName updates the device name and persists.
 func (c *Config) SetDeviceName(name string) error {
 	c.mu.Lock()
 	c.DeviceName = name
+	if err := c.validateLocked(); err != nil {
+		c.mu.Unlock()
+		return err
+	}
 	c.mu.Unlock()
 	return c.Save()
 }

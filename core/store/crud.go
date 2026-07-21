@@ -5,21 +5,22 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 )
 
 // ShareRecord represents a row in the shares table.
 type ShareRecord struct {
-	ID           string    `json:"id"`
-	Kind         string    `json:"kind"`      // "link" or "direct"
-	Target       string    `json:"target"`    // device name or URL
-	FilePath     string    `json:"file_path"`
-	Size         int64     `json:"size"`
-	Status       string    `json:"status"`    // active, expired, stopped, completed
-	CreatedAt    time.Time `json:"created_at"`
+	ID           string     `json:"id"`
+	Kind         string     `json:"kind"`   // "link" or "direct"
+	Target       string     `json:"target"` // device name or URL
+	FilePath     string     `json:"file_path"`
+	Size         int64      `json:"size"`
+	Status       string     `json:"status"` // active, expired, stopped, completed
+	CreatedAt    time.Time  `json:"created_at"`
 	ExpiresAt    *time.Time `json:"expires_at,omitempty"`
-	Downloads    int       `json:"downloads"`
-	MaxDownloads *int      `json:"max_downloads,omitempty"`
+	Downloads    int        `json:"downloads"`
+	MaxDownloads *int       `json:"max_downloads,omitempty"`
 }
 
 // TransferRecord represents a row in the transfers table.
@@ -56,11 +57,11 @@ const (
 
 // ListOptions controls pagination, search, and sorting for list queries.
 type ListOptions struct {
-	Search  string    // fuzzy match on file_path
-	SortBy  SortField
-	Order   SortOrder
-	Limit   int
-	Offset  int
+	Search string // fuzzy match on file_path
+	SortBy SortField
+	Order  SortOrder
+	Limit  int
+	Offset int
 }
 
 // DefaultListOptions returns sensible defaults.
@@ -131,33 +132,65 @@ func (db *DB) DeleteShare(id string) error {
 }
 
 // ListShares returns shares matching the given options.
-func (db *DB) ListShares(opts ListOptions) ([]*ShareRecord, error) {
-	orderBy := "created_at"
-	switch opts.SortBy {
-	case SortBySize:
-		orderBy = "size"
-	case SortByName:
-		orderBy = "file_path"
-	case SortByStatus:
-		orderBy = "status"
-	}
-	order := "DESC"
-	if opts.Order == SortAsc {
-		order = "ASC"
-	}
+var validShareOrderBy = map[SortField]string{
+	SortByTime:   "created_at",
+	SortBySize:   "size",
+	SortByName:   "file_path",
+	SortByStatus: "status",
+}
 
-	query := fmt.Sprintf(
-		`SELECT id, kind, target, file_path, size, status, created_at, expires_at, downloads, max_downloads
-		 FROM shares WHERE file_path LIKE ? ORDER BY %s %s LIMIT ? OFFSET ?`,
-		orderBy, order,
-	)
-	search := "%" + opts.Search + "%"
+var validTransferOrderBy = map[SortField]string{
+	SortByTime:   "started_at",
+	SortBySize:   "size",
+	SortByName:   "file_path",
+	SortByStatus: "status",
+}
+
+func safeOrderBy(m map[SortField]string, field SortField) string {
+	if col, ok := m[field]; ok {
+		return col
+	}
+	for _, v := range m {
+		return v
+	}
+	return "created_at"
+}
+
+func safeOrder(order SortOrder) string {
+	if order == SortAsc {
+		return "ASC"
+	}
+	return "DESC"
+}
+
+func (db *DB) ListShares(opts ListOptions) ([]*ShareRecord, error) {
+	orderBy := safeOrderBy(validShareOrderBy, opts.SortBy)
+	order := safeOrder(opts.Order)
+
+	var query string
+	var args []any
+	if opts.Search != "" {
+		query = fmt.Sprintf(
+			`SELECT id, kind, target, file_path, size, status, created_at, expires_at, downloads, max_downloads
+			 FROM shares WHERE file_path LIKE ? ESCAPE '!' ORDER BY %s %s LIMIT ? OFFSET ?`,
+			orderBy, order,
+		)
+		search := "%" + escapeLike(opts.Search) + "%"
+		args = append(args, search)
+	} else {
+		query = fmt.Sprintf(
+			`SELECT id, kind, target, file_path, size, status, created_at, expires_at, downloads, max_downloads
+			 FROM shares ORDER BY %s %s LIMIT ? OFFSET ?`,
+			orderBy, order,
+		)
+	}
 	limit := opts.Limit
 	if limit <= 0 {
 		limit = 100
 	}
+	args = append(args, limit, opts.Offset)
 
-	rows, err := db.Query(query, search, limit, opts.Offset)
+	rows, err := db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -249,32 +282,33 @@ func (db *DB) DeleteTransfer(id string) error {
 
 // ListTransfers returns transfers matching the given options.
 func (db *DB) ListTransfers(opts ListOptions) ([]*TransferRecord, error) {
-	orderBy := "started_at"
-	switch opts.SortBy {
-	case SortBySize:
-		orderBy = "size"
-	case SortByName:
-		orderBy = "file_path"
-	case SortByStatus:
-		orderBy = "status"
-	}
-	order := "DESC"
-	if opts.Order == SortAsc {
-		order = "ASC"
-	}
+	orderBy := safeOrderBy(validTransferOrderBy, opts.SortBy)
+	order := safeOrder(opts.Order)
 
-	query := fmt.Sprintf(
-		`SELECT id, direction, peer_device_id, peer_name, file_path, size, status, started_at, finished_at, error
-		 FROM transfers WHERE file_path LIKE ? ORDER BY %s %s LIMIT ? OFFSET ?`,
-		orderBy, order,
-	)
-	search := "%" + opts.Search + "%"
+	var query string
+	var args []any
+	if opts.Search != "" {
+		query = fmt.Sprintf(
+			`SELECT id, direction, peer_device_id, peer_name, file_path, size, status, started_at, finished_at, error
+			 FROM transfers WHERE file_path LIKE ? ESCAPE '!' ORDER BY %s %s LIMIT ? OFFSET ?`,
+			orderBy, order,
+		)
+		search := "%" + escapeLike(opts.Search) + "%"
+		args = append(args, search)
+	} else {
+		query = fmt.Sprintf(
+			`SELECT id, direction, peer_device_id, peer_name, file_path, size, status, started_at, finished_at, error
+			 FROM transfers ORDER BY %s %s LIMIT ? OFFSET ?`,
+			orderBy, order,
+		)
+	}
 	limit := opts.Limit
 	if limit <= 0 {
 		limit = 100
 	}
+	args = append(args, limit, opts.Offset)
 
-	rows, err := db.Query(query, search, limit, opts.Offset)
+	rows, err := db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -473,4 +507,11 @@ func nullIntStr(n sql.NullInt64) string {
 		return ""
 	}
 	return fmt.Sprintf("%d", n.Int64)
+}
+
+func escapeLike(s string) string {
+	s = strings.ReplaceAll(s, `!`, `!!`)
+	s = strings.ReplaceAll(s, `%`, `!%`)
+	s = strings.ReplaceAll(s, `_`, `!_`)
+	return s
 }

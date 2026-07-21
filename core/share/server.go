@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"time"
@@ -174,14 +175,13 @@ func (s *Server) serveZip(w http.ResponseWriter, r *http.Request, share *Share) 
 	defer pr.Close()
 
 	go func() {
-		defer pw.Close()
 		err := StreamZip(pw, share.Path, func(path string, size int64) {
 			slog.Debug("zip add", "path", path, "size", size)
 		})
 		if err != nil {
 			slog.Error("zip stream failed", "token", share.Token[:8]+"...", "error", err)
-			pw.CloseWithError(err)
 		}
+		pw.CloseWithError(err)
 	}()
 
 	_, err := io.Copy(w, pr)
@@ -212,16 +212,16 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"token":              share.Token,
-		"name":               share.Name,
-		"size":               share.Size,
-		"is_dir":             share.IsDir,
-		"has_password":       share.HasPassword,
-		"downloads":          share.Downloads,
-		"max_downloads":      share.MaxDownloads,
+		"token":               share.Token,
+		"name":                share.Name,
+		"size":                share.Size,
+		"is_dir":              share.IsDir,
+		"has_password":        share.HasPassword,
+		"downloads":           share.Downloads,
+		"max_downloads":       share.MaxDownloads,
 		"remaining_downloads": share.RemainingDownloads(),
-		"remaining_seconds":  int(share.RemainingTime().Seconds()),
-		"created_at":         share.CreatedAt.Format(time.RFC3339),
+		"remaining_seconds":   int(share.RemainingTime().Seconds()),
+		"created_at":          share.CreatedAt.Format(time.RFC3339),
 	})
 }
 
@@ -250,7 +250,7 @@ func (s *Server) handleQR(w http.ResponseWriter, r *http.Request) {
 
 	url := fmt.Sprintf("%s://%s/dl/%s", scheme, host, share.Token)
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Write([]byte(url))
+	_, _ = w.Write([]byte(url))
 }
 
 // --- HTML template ---
@@ -353,9 +353,7 @@ func formatDuration(d time.Duration) string {
 }
 
 func urlEncode(s string) string {
-	// Minimal URL encoding for Content-Disposition filename*
-	t := template.URLQueryEscaper(s)
-	return t
+	return url.QueryEscape(s)
 }
 
 // ShareURL builds the full download URL for a share on the given host.

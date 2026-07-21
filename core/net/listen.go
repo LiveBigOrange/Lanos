@@ -12,9 +12,12 @@ type Listener struct {
 	ln         stdnet.Listener
 	staticKeys transport.StaticKeys
 	quit       chan struct{}
-	wg         sync.WaitGroup
+	closeOnce  sync.Once
 }
 
+// NewListener creates a TCP listener for Noise-encrypted transport connections.
+// The addr may be "ip:port" (v4-only), "[ip]:port" (v6-only), or ":port" (dual-stack).
+// Go's "tcp" network resolves to dual-stack when addr contains no explicit IP.
 func NewListener(addr string, staticKeys transport.StaticKeys) (*Listener, error) {
 	raw, err := stdnet.Listen("tcp", addr)
 	if err != nil {
@@ -98,9 +101,12 @@ func (l *Listener) Accept() (*AcceptResult, error) {
 }
 
 func (l *Listener) Close() error {
-	close(l.quit)
-	l.wg.Wait()
-	return l.ln.Close()
+	var err error
+	l.closeOnce.Do(func() {
+		close(l.quit)
+		err = l.ln.Close()
+	})
+	return err
 }
 
 var PortPicker struct {
@@ -120,4 +126,10 @@ func PickPort() int {
 		PortPicker.base = 52100
 	}
 	return port
+}
+
+func ResetPortPicker() {
+	PortPicker.mu.Lock()
+	defer PortPicker.mu.Unlock()
+	PortPicker.base = 0
 }

@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import 'l10n/app_localizations.dart';
 import 'services/api_client.dart';
+import 'services/device_service.dart';
 import 'services/lifecycle_controller.dart';
+import 'services/notification_service.dart';
+import 'services/transfer_service.dart';
 import 'pages/home_page.dart';
+import 'pages/onboarding_page.dart';
 
 /// Lanos application entry point.
 ///
@@ -24,6 +30,8 @@ class LanosApp extends StatelessWidget {
     return MaterialApp(
       title: 'Lanos',
       debugShowCheckedModeBanner: false,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
       theme: ThemeData(
         useMaterial3: true,
         colorSchemeSeed: const Color(0xFF3B82F6),
@@ -40,9 +48,11 @@ class LanosApp extends StatelessWidget {
 }
 
 /// Top-level widget that owns the [LifecycleController] and renders either
-/// the loading screen, the error screen, or the [HomePage].
+/// the loading screen, the error screen, the onboarding, or the [HomePage].
 class LanosHome extends StatefulWidget {
-  const LanosHome({super.key});
+  const LanosHome({super.key, this.lifecycleController});
+
+  final LifecycleController? lifecycleController;
 
   @override
   State<LanosHome> createState() => _LanosHomeState();
@@ -52,18 +62,56 @@ class _LanosHomeState extends State<LanosHome> {
   late final LifecycleController _lifecycle;
   _LifecyclePhase _phase = _LifecyclePhase.starting;
   String? _error;
+  bool _showOnboarding = false;
+
+  TransferService? _transferService;
+  NotificationService? _notificationService;
+  DeviceService? _deviceService;
 
   @override
   void initState() {
     super.initState();
-    _lifecycle = LifecycleController();
+    _lifecycle = widget.lifecycleController ?? LifecycleControllerDesktop();
+    _checkOnboarding();
     _boot();
+  }
+
+  @override
+  void dispose() {
+    _transferService?.removeListener(_onTransferChange);
+    _transferService?.dispose();
+    _notificationService?.dispose();
+    _deviceService?.dispose();
+    _apiClient?.close();
+    super.dispose();
+  }
+
+  void _onTransferChange() {
+    // no-op; notification wiring is in the callback, UI is per-page.
+  }
+
+  Future<void> _checkOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    final done = prefs.getBool('onboarding_done') ?? false;
+    setState(() => _showOnboarding = !done);
   }
 
   Future<void> _boot() async {
     try {
       final api = await _lifecycle.start();
       if (!mounted) return;
+      _notificationService = NotificationService();
+      await _notificationService!.init();
+      final ts = TransferService(api);
+      ts.onIncomingCompleted =
+          (item) => _notificationService!.onFileReceived(item.fileName);
+      ts.addListener(_onTransferChange);
+      ts.start();
+      _transferService = ts;
+      final ds = DeviceService(api);
+      ds.start();
+      _deviceService = ds;
       setState(() {
         _apiClient = api;
         _phase = _LifecyclePhase.ready;
@@ -87,13 +135,20 @@ class _LanosHomeState extends State<LanosHome> {
 
   @override
   Widget build(BuildContext context) {
+    if (_showOnboarding) {
+      return OnboardingPage(
+        onDone: () {
+          setState(() => _showOnboarding = false);
+        },
+      );
+    }
     switch (_phase) {
       case _LifecyclePhase.starting:
         return const _LoadingScreen();
       case _LifecyclePhase.failed:
         return _ErrorScreen(error: _error ?? 'unknown error', onRetry: _boot);
       case _LifecyclePhase.ready:
-        return HomePage(api: _apiClient!);
+        return HomePage(api: _apiClient!, transferService: _transferService, deviceService: _deviceService);
     }
   }
 }
@@ -105,14 +160,15 @@ class _LoadingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    final l10n = AppLocalizations.of(context)!;
+    return Scaffold(
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('正在启动 Lanos 守护进程...'),
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(l10n.bootingDaemon),
           ],
         ),
       ),
@@ -128,6 +184,7 @@ class _ErrorScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       body: Center(
         child: Padding(
@@ -137,14 +194,18 @@ class _ErrorScreen extends StatelessWidget {
             children: [
               const Icon(Icons.error_outline, size: 64, color: Colors.red),
               const SizedBox(height: 16),
-              const Text('启动失败', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+              Text(
+                l10n.bootFailed,
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              ),
               const SizedBox(height: 8),
               Text(error, textAlign: TextAlign.center),
               const SizedBox(height: 24),
               FilledButton.icon(
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh),
-                label: const Text('重试启动'),
+                label: Text(l10n.retryBoot),
               ),
             ],
           ),

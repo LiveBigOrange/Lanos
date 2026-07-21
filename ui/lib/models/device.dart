@@ -57,8 +57,10 @@ class Device {
       port: (json['port'] as num?)?.toInt() ?? 0,
       pubHash: json['pub_hash'] as String? ?? '',
       ipVersion: json['ip_version'] as String? ?? '4',
-      ipv4: (json['ipv4'] as List?)?.map((e) => e as String).toList() ?? const [],
-      ipv6: (json['ipv6'] as List?)?.map((e) => e as String).toList() ?? const [],
+      ipv4:
+          (json['ipv4'] as List?)?.map((e) => e as String).toList() ?? const [],
+      ipv6:
+          (json['ipv6'] as List?)?.map((e) => e as String).toList() ?? const [],
       hostname: json['hostname'] as String? ?? '',
       firstSeen: _parseTime(json['first_seen']),
       lastSeen: _parseTime(json['last_seen']),
@@ -83,10 +85,19 @@ class Device {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is Device && runtimeType == other.runtimeType && id == other.id && name == other.name && port == other.port && pubHash == other.pubHash && ipVersion == other.ipVersion && _listEq(ipv4, other.ipv4) && _listEq(ipv6, other.ipv6) && hostname == other.hostname;
+      other is Device &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          name == other.name &&
+          port == other.port &&
+          pubHash == other.pubHash &&
+          ipVersion == other.ipVersion &&
+          _listEq(ipv4, other.ipv4) &&
+          _listEq(ipv6, other.ipv6) &&
+          hostname == other.hostname;
 
   @override
-  int get hashCode => Object.hash(id, name, port, pubHash, ipVersion, hostname);
+  int get hashCode => Object.hash(id, name, port, pubHash, ipVersion, hostname, Object.hashAll(ipv4), Object.hashAll(ipv6));
 
   static bool _listEq(List<String> a, List<String> b) {
     if (a.length != b.length) return false;

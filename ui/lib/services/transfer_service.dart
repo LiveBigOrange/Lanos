@@ -7,7 +7,15 @@ import 'api_client.dart';
 
 enum TransferDirection { outgoing, incoming }
 
-enum TransferStatus { pending, transferring, completed, failed, cancelled }
+enum TransferStatus {
+  pending,
+  connecting,
+  transferring,
+  completed,
+  failed,
+  cancelled,
+  awaitingResume,
+}
 
 class TransferItem {
   const TransferItem({
@@ -54,14 +62,31 @@ class TransferItem {
 typedef TransferListFetcher = Future<List<Map<String, dynamic>>> Function();
 
 class TransferService extends ChangeNotifier {
-  TransferService(ApiClient api, {Duration interval = const Duration(seconds: 2)})
-      : this.withFetcher(() => api.get('/api/v1/transfers'), interval);
+  TransferService(
+    ApiClient api, {
+    Duration interval = const Duration(seconds: 2),
+  }) : this._withApi(api, interval);
+
+  TransferService._withApi(ApiClient api, Duration interval)
+      : _fetch = (() async => [await api.get('/api/v1/transfers')]),
+        _interval = interval,
+        _api = api;
 
   @visibleForTesting
-  TransferService.withFetcher(this._fetch, this._interval);
+  TransferService.withFetcher(
+    this._fetch,
+    this._interval,
+  ) : _api = null;
 
   final TransferListFetcher _fetch;
   final Duration _interval;
+  final ApiClient? _api;
+
+  /// Fires once per incoming transfer that transitions to [completed]. Wire
+  /// this to [NotificationService.onFileReceived] (P1-22).
+  void Function(TransferItem)? onIncomingCompleted;
+
+  final Set<String> _notifiedCompletedIds = {};
 
   List<TransferItem> _items = [];
   List<TransferItem> get items => _items;
@@ -72,8 +97,8 @@ class TransferService extends ChangeNotifier {
 
   void start() {
     if (_timer != null) return;
-    _fetch();
-    _timer = Timer.periodic(_interval, (_) => _fetch());
+    _doFetch();
+    _timer = Timer.periodic(_interval, (_) => _doFetch());
   }
 
   void stop() {
@@ -81,25 +106,35 @@ class TransferService extends ChangeNotifier {
     _timer = null;
   }
 
-  Future<void> refresh() => _fetch();
+  Future<void> refresh() => _doFetch();
 
   Future<void> cancelTransfer(String id) async {
-    // TODO: POST /api/v1/transfers/{id}/cancel when API endpoint exists.
-    _items = _items.map((t) {
-      return t.id == id && t.status == TransferStatus.transferring
-          ? t.copyWith(status: TransferStatus.cancelled)
-          : t;
-    }).toList();
-    notifyListeners();
+    await _api?.post('/api/v1/transfers/$id/cancel');
+    await _doFetch();
   }
 
-  Future<void> _fetch() async {
+  Future<void> _doFetch() async {
     if (_fetching || _disposed) return;
     _fetching = true;
     try {
       final jsonList = await _fetch();
       if (_disposed) return;
-      _items = jsonList.map((json) => _parseItem(json)).toList();
+      final newItems = jsonList.map((json) => _parseItem(json)).toList();
+
+      if (onIncomingCompleted != null) {
+        for (final item in newItems) {
+          if (item.direction == TransferDirection.incoming &&
+              item.status == TransferStatus.completed &&
+              !_notifiedCompletedIds.contains(item.id)) {
+            _notifiedCompletedIds.add(item.id);
+            onIncomingCompleted!(item);
+          }
+        }
+      }
+      _notifiedCompletedIds
+          .retainWhere((id) => newItems.any((i) => i.id == id));
+
+      _items = newItems;
       notifyListeners();
     } catch (_) {
       // Silently keep stale list; errors will surface when user interacts.
@@ -122,7 +157,14 @@ class TransferService extends ChangeNotifier {
       fileSize: json['file_size'] as int? ?? 0,
       peer: peerJson != null
           ? Device.fromJson(peerJson)
-          : const Device(id: '', name: 'Unknown', addresses: []),
+          : const Device(
+              id: '',
+              name: 'Unknown',
+              platform: '',
+              port: 0,
+              pubHash: '',
+              ipVersion: '',
+            ),
       progress: (json['progress'] as num?)?.toDouble() ?? 0.0,
       error: json['error'] as String?,
       startedAt: json['started_at'] != null
@@ -135,6 +177,8 @@ class TransferService extends ChangeNotifier {
     switch (s) {
       case 'pending':
         return TransferStatus.pending;
+      case 'connecting':
+        return TransferStatus.connecting;
       case 'transferring':
         return TransferStatus.transferring;
       case 'completed':
@@ -143,6 +187,8 @@ class TransferService extends ChangeNotifier {
         return TransferStatus.failed;
       case 'cancelled':
         return TransferStatus.cancelled;
+      case 'awaiting_resume':
+        return TransferStatus.awaitingResume;
       default:
         return TransferStatus.pending;
     }

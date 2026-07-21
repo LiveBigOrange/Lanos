@@ -32,9 +32,9 @@ const frameRecvBuf = 128
 
 // Mux multiplexes Streams over one reliable ordered byte connection.
 type Mux struct {
-	conn     io.ReadWriteCloser
-	role     HandshakeRole
-	writeMu  sync.Mutex // serializes frame writes onto the wire
+	conn    io.ReadWriteCloser
+	role    HandshakeRole
+	writeMu sync.Mutex // serializes frame writes onto the wire
 
 	mu       sync.Mutex
 	streams  map[uint32]*Stream
@@ -201,9 +201,9 @@ type Stream struct {
 
 func newStream(id uint32, m *Mux) *Stream {
 	return &Stream{
-		id:    id,
-		mux:   m,
-		rcvCh: make(chan Frame, frameRecvBuf),
+		id:     id,
+		mux:    m,
+		rcvCh:  make(chan Frame, frameRecvBuf),
 		doneCh: make(chan struct{}),
 	}
 }

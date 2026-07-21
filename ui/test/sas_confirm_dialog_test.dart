@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:lanos/l10n/app_localizations.dart';
 import 'package:lanos/widgets/sas_confirm_dialog.dart';
 
 void main() {
@@ -8,6 +9,9 @@ void main() {
     testWidgets('shows device name and 4-digit code', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          locale: const Locale('zh'),
           home: Builder(
             builder: (context) => Scaffold(
               body: ElevatedButton(
@@ -37,6 +41,9 @@ void main() {
       bool cancelled = false;
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          locale: const Locale('zh'),
           home: Builder(
             builder: (context) => Scaffold(
               body: ElevatedButton(
@@ -67,6 +74,9 @@ void main() {
       bool confirmed = false;
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          locale: const Locale('zh'),
           home: Builder(
             builder: (context) => Scaffold(
               body: ElevatedButton(
@@ -96,6 +106,9 @@ void main() {
       bool timedOut = false;
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          locale: const Locale('zh'),
           home: Builder(
             builder: (context) => Scaffold(
               body: ElevatedButton(
@@ -115,8 +128,10 @@ void main() {
       await tester.tap(find.text('open'));
       await tester.pumpAndSettle();
 
-      // Fast-forward past the 2s timeout. pump periodic timers.
+      // Fast-forward past the 2s timeout to trigger auto-cancel, then
+      // settle the dialog exit animation so the route is fully removed.
       await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
 
       expect(timedOut, isTrue);
       expect(find.text('确认配对'), findsNothing);
@@ -126,6 +141,9 @@ void main() {
         (tester) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          locale: const Locale('zh'),
           home: Builder(
             builder: (context) => Scaffold(
               body: ElevatedButton(
@@ -152,6 +170,9 @@ void main() {
     testWidgets('barrier tap does not dismiss the dialog', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          locale: const Locale('zh'),
           home: Builder(
             builder: (context) => Scaffold(
               body: ElevatedButton(

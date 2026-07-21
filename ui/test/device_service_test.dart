@@ -112,7 +112,7 @@ void main() {
 
   group('Device model', () {
     test('parses minimal JSON', () {
-      final d = Device.fromJson({
+      final d = Device.fromJson(const {
         'id': 'abc',
         'name': 'Foo',
         'platform': 'linux',
@@ -129,23 +129,79 @@ void main() {
 
     test('primaryAddress prefers IPv4 then IPv6 then hostname', () {
       expect(
-        Device(id: 'a', name: 'n', platform: 'linux', port: 1, pubHash: 'a', ipVersion: '4', ipv4: ['1.2.3.4'], hostname: 'h.local').primaryAddress,
+        const Device(
+          id: 'a',
+          name: 'n',
+          platform: 'linux',
+          port: 1,
+          pubHash: 'a',
+          ipVersion: '4',
+          ipv4: ['1.2.3.4'],
+          hostname: 'h.local',
+        ).primaryAddress,
         '1.2.3.4',
       );
       expect(
-        Device(id: 'a', name: 'n', platform: 'linux', port: 1, pubHash: 'a', ipVersion: '6', ipv6: ['fe80::1'], hostname: 'h.local').primaryAddress,
+        const Device(
+          id: 'a',
+          name: 'n',
+          platform: 'linux',
+          port: 1,
+          pubHash: 'a',
+          ipVersion: '6',
+          ipv6: ['fe80::1'],
+          hostname: 'h.local',
+        ).primaryAddress,
         'fe80::1',
       );
       expect(
-        Device(id: 'a', name: 'n', platform: 'linux', port: 1, pubHash: 'a', ipVersion: '4', hostname: 'h.local').primaryAddress,
+        const Device(
+          id: 'a',
+          name: 'n',
+          platform: 'linux',
+          port: 1,
+          pubHash: 'a',
+          ipVersion: '4',
+          hostname: 'h.local',
+        ).primaryAddress,
         'h.local',
       );
     });
 
     test('supportsIPv6 reflects ip_version', () {
-      expect(Device(id: 'a', name: 'n', platform: '', port: 1, pubHash: 'a', ipVersion: '4').supportsIPv6, isFalse);
-      expect(Device(id: 'a', name: 'n', platform: '', port: 1, pubHash: 'a', ipVersion: '6').supportsIPv6, isTrue);
-      expect(Device(id: 'a', name: 'n', platform: '', port: 1, pubHash: 'a', ipVersion: '46').supportsIPv6, isTrue);
+      expect(
+        const Device(
+          id: 'a',
+          name: 'n',
+          platform: '',
+          port: 1,
+          pubHash: 'a',
+          ipVersion: '4',
+        ).supportsIPv6,
+        isFalse,
+      );
+      expect(
+        const Device(
+          id: 'a',
+          name: 'n',
+          platform: '',
+          port: 1,
+          pubHash: 'a',
+          ipVersion: '6',
+        ).supportsIPv6,
+        isTrue,
+      );
+      expect(
+        const Device(
+          id: 'a',
+          name: 'n',
+          platform: '',
+          port: 1,
+          pubHash: 'a',
+          ipVersion: '46',
+        ).supportsIPv6,
+        isTrue,
+      );
     });
 
     test('iconForPlatform returns sensible icons', () {

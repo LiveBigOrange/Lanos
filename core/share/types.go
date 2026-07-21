@@ -6,6 +6,7 @@ package share
 import (
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
 	"fmt"
 	"time"
@@ -48,19 +49,19 @@ const ZipStreamTimeout = 30 * time.Minute
 
 // Share represents a single active web share.
 type Share struct {
-	Token       string    `json:"token"`
-	Path        string    `json:"path"`        // absolute file/folder path
-	IsDir       bool      `json:"is_dir"`
-	Name        string    `json:"name"`        // display name (base name of path)
-	Size        int64     `json:"size"`        // total size in bytes (0 for dirs until zipped)
-	PasswordHash [32]byte `json:"-"`           // SHA256(password + salt)
-	Salt        [16]byte  `json:"-"`           // per-share random salt
-	HasPassword bool      `json:"has_password"`
-	Expiry      time.Time `json:"expiry"`
-	MaxDownloads int      `json:"max_downloads"`
-	Downloads   int       `json:"downloads"`
-	CreatedAt   time.Time `json:"created_at"`
-	Stopped     bool      `json:"stopped"`
+	Token        string    `json:"token"`
+	Path         string    `json:"path"` // absolute file/folder path
+	IsDir        bool      `json:"is_dir"`
+	Name         string    `json:"name"` // display name (base name of path)
+	Size         int64     `json:"size"` // total size in bytes (0 for dirs until zipped)
+	PasswordHash [32]byte  `json:"-"`    // SHA256(password + salt)
+	Salt         [16]byte  `json:"-"`    // per-share random salt
+	HasPassword  bool      `json:"has_password"`
+	Expiry       time.Time `json:"expiry"`
+	MaxDownloads int       `json:"max_downloads"`
+	Downloads    int       `json:"downloads"`
+	CreatedAt    time.Time `json:"created_at"`
+	Stopped      bool      `json:"stopped"`
 }
 
 // NewShare creates a new share with a random token and optional password.
@@ -116,11 +117,14 @@ func HashPassword(password string, salt [16]byte) [32]byte {
 }
 
 // VerifyPassword checks if the given password matches the stored hash.
+// Comparison is constant-time to avoid leaking information about the hash
+// to an attacker who can time password-submission responses.
 func (s *Share) VerifyPassword(password string) bool {
 	if !s.HasPassword {
 		return true
 	}
-	return s.PasswordHash == HashPassword(password, s.Salt)
+	got := HashPassword(password, s.Salt)
+	return subtle.ConstantTimeCompare(s.PasswordHash[:], got[:]) == 1
 }
 
 // Expired reports whether the share has passed its expiry time.

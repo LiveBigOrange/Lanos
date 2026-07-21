@@ -81,7 +81,7 @@ func (b *eventBroker) subscribe() (<-chan discovery.Event, func()) {
 		b.mu.Lock()
 		delete(b.subs, ch)
 		b.mu.Unlock()
-		close(ch)
+
 	}
 	return ch, cancel
 }

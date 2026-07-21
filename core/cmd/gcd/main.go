@@ -15,8 +15,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"net"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 
 	"github.com/lanos/lanos/core/api"
@@ -25,7 +28,12 @@ import (
 	"github.com/lanos/lanos/core/identity"
 	"github.com/lanos/lanos/core/instance"
 	"github.com/lanos/lanos/core/lifecycle"
+	corenet "github.com/lanos/lanos/core/net"
+	"github.com/lanos/lanos/core/receive"
+	"github.com/lanos/lanos/core/share"
 	"github.com/lanos/lanos/core/store"
+	"github.com/lanos/lanos/core/transfer"
+	"github.com/lanos/lanos/core/transport"
 )
 
 const version = "0.1.0"
@@ -104,14 +112,76 @@ func run() error {
 	}
 	defer disc.Stop()
 
+	// 6b. Linux: warn if Avahi daemon is missing (mDNS will silently fail).
+	if runtime.GOOS == "linux" {
+		if err := corenet.CheckAvahi(); err != nil {
+			fmt.Fprintf(os.Stderr, "gcd: warn: %v\n", err)
+		}
+		if hint := corenet.CheckFirewall(); hint != "" {
+			fmt.Fprintf(os.Stderr, "gcd: warn: %s\n", hint)
+		}
+	}
+
+	// 6c. Web share server: binds a second listener (dual-stack) so LAN
+	// peers can reach it. Uses the same port as the API when possible —
+	// the API binds 127.0.0.1 only, so the share listener binds 0.0.0.0
+	// on a separate port from the 52100-52999 range.
+	shareMgr := share.NewManager(share.MaxShares)
+	shareLn, err := net.Listen("tcp", fmt.Sprintf(":%d", port+1))
+	if err != nil {
+		// Port conflict: fall back to a random port.
+		shareLn, err = net.Listen("tcp", ":0")
+		if err != nil {
+			return fmt.Errorf("bind share listener: %w", err)
+		}
+	}
+	shareSrv := share.NewServer(shareMgr, shareLn)
+	go func() {
+		if err := shareSrv.Start(); err != nil {
+			fmt.Fprintf(os.Stderr, "gcd: share server: %v\n", err)
+		}
+	}()
+	defer shareSrv.Close() // StopAll: all share links die with the process.
+	defer shareMgr.Stop()  // terminate cleanupLoop goroutine
+
+	// 6d. Derive X25519 static keys from ed25519 identity for Noise XX.
+	staticKeys, err := transport.DeriveStaticKeys(ident.PrivED)
+	if err != nil {
+		return fmt.Errorf("derive static keys: %w", err)
+	}
+
+	// 6e. Transfer and receive managers for live transfer state.
+	transferMgr := transfer.NewManager(transfer.DefaultMaxConcurrent)
+	receiveMgr := receive.NewManager(receive.DefaultMaxConcurrent)
+	receiveMgr.StartExpiryLoop(ctx.Done(), 0)
+
+	// 6f. Inbound P2P transfer listener (P1-8).
+	inboundSrv, err := receive.NewInboundServer(fmt.Sprintf(":%d", port+2), receiveMgr, staticKeys)
+	if err != nil {
+		// Port conflict: fall back to a random port, same as shareLn above.
+		slog.Warn("inbound: preferred port busy, falling back to random", "preferred", port+2)
+		inboundSrv, err = receive.NewInboundServer(":0", receiveMgr, staticKeys)
+		if err != nil {
+			return fmt.Errorf("inbound p2p: %w", err)
+		}
+	}
+	inboundSrv.Start()
+	defer inboundSrv.Close()
+	slog.Info("inbound p2p listener", "addr", inboundSrv.Addr())
+
 	// 7. Build API server with discovery wired in (for /api/v1/devices).
 	srv := api.NewServer(api.Config{
-		Version:     version,
-		Token:       token,
-		Config:      cfg,
-		DB:          db,
-		Discovery:   disc,
-		EventSource: disc,
+		Version:      version,
+		Token:        token,
+		Config:       cfg,
+		DB:           db,
+		Discovery:    disc,
+		ShareManager: shareMgr,
+		SharePort:    shareSrv.Port(),
+		TransferMgr:  transferMgr,
+		ReceiveMgr:   receiveMgr,
+		StaticKeys:   staticKeys,
+		EventSource:  disc,
 	})
 
 	// 8. Handshake: emit JSON to stdout for Flutter to read.

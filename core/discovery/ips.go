@@ -72,6 +72,119 @@ func localUnicastIPs() []net.IP {
 	return out
 }
 
+// LocalSourceIPs returns candidate source IP string-forms for outgoing
+// connection address selection. Includes global unicast (v4 and v6) plus
+// loopback (::1, 127.0.0.0/8) and link-local v6 so that RFC 6724 selection can
+// match peers advertising any scope. Excludes multicast.
+//
+// This is the source-side input for core/net.SelectAddresses.
+func LocalSourceIPs() []string {
+	var out []string
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return out
+	}
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagUp == 0 {
+			continue
+		}
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, addr := range addrs {
+			var ip net.IP
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+			if ip == nil || ip.IsMulticast() {
+				continue
+			}
+			if v4 := ip.To4(); v4 != nil {
+				out = append(out, v4.String())
+			} else {
+				out = append(out, ip.String())
+			}
+		}
+	}
+	return dedupStrings(out)
+}
+
+// LocalIPVersion returns detected local IP stack: "4", "6", or "46" — based
+// on non-loopback, non-link-local unicast addresses only.
+func LocalIPVersion() string {
+	return detectIPVersion()
+}
+
+// InterfaceInfo is a snapshot of a network interface for diagnostics output.
+// IPv4 / IPv6 lists are sorted string forms of unicast addresses only
+// (multicast is excluded). Loop back and link-local addresses are included.
+type InterfaceInfo struct {
+	Name     string   `json:"name"`
+	Flags    []string `json:"flags"`
+	IPv4     []string `json:"ipv4,omitempty"`
+	IPv6     []string `json:"ipv6,omitempty"`
+	MTU      int      `json:"mtu"`
+	Hardware string   `json:"hardware,omitempty"`
+}
+
+// Interfaces returns a snapshot of every annotated interface for the
+// diagnostics endpoint. Errors are aggregated: interfaces that fail
+// enumeration are simply omitted.
+func Interfaces() []InterfaceInfo {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return nil
+	}
+	var out []InterfaceInfo
+	for _, iface := range ifaces {
+		info := InterfaceInfo{
+			Name:     iface.Name,
+			MTU:      iface.MTU,
+			Hardware: iface.HardwareAddr.String(),
+		}
+		if iface.Flags&net.FlagUp != 0 {
+			info.Flags = append(info.Flags, "up")
+		}
+		if iface.Flags&net.FlagLoopback != 0 {
+			info.Flags = append(info.Flags, "loopback")
+		}
+		if iface.Flags&net.FlagBroadcast != 0 {
+			info.Flags = append(info.Flags, "broadcast")
+		}
+		if iface.Flags&net.FlagPointToPoint != 0 {
+			info.Flags = append(info.Flags, "pointtopoint")
+		}
+		addrs, err := iface.Addrs()
+		if err != nil {
+			out = append(out, info)
+			continue
+		}
+		for _, addr := range addrs {
+			var ip net.IP
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+			if ip == nil || ip.IsMulticast() {
+				continue
+			}
+			if v4 := ip.To4(); v4 != nil {
+				info.IPv4 = append(info.IPv4, v4.String())
+			} else {
+				info.IPv6 = append(info.IPv6, ip.String())
+			}
+		}
+		out = append(out, info)
+	}
+	return out
+}
+
 // localIPv4Strings / localIPv6Strings return deduplicated string forms.
 func localIPv4Strings() []string {
 	var out []string

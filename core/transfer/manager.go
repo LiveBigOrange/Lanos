@@ -2,6 +2,7 @@ package transfer
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -18,26 +19,30 @@ var (
 type Status string
 
 const (
-	StatusPending     Status = "pending"
-	StatusConnecting  Status = "connecting"
-	StatusTransferring Status = "transferring"
-	StatusCompleted   Status = "completed"
-	StatusFailed      Status = "failed"
-	StatusCancelled   Status = "cancelled"
+	StatusPending        Status = "pending"
+	StatusConnecting     Status = "connecting"
+	StatusTransferring   Status = "transferring"
+	StatusCompleted      Status = "completed"
+	StatusFailed         Status = "failed"
+	StatusCancelled      Status = "cancelled"
+	StatusAwaitingResume Status = "awaiting_resume"
 )
 
 type Transfer struct {
-	ID         string    `json:"id"`
-	PeerID     string    `json:"peer_id"`
-	PeerName   string    `json:"peer_name"`
-	FileName   string    `json:"file_name"`
-	FilePath   string    `json:"file_path"`
-	FileSize   int64     `json:"file_size"`
-	SentBytes  int64     `json:"sent_bytes"`
-	Status     Status    `json:"status"`
-	Error      string    `json:"error,omitempty"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	ID        string    `json:"id"`
+	PeerID    string    `json:"peer_id"`
+	PeerName  string    `json:"peer_name"`
+	FileName  string    `json:"file_name"`
+	FilePath  string    `json:"file_path"`
+	FileSize  int64     `json:"file_size"`
+	SentBytes int64     `json:"sent_bytes"`
+	Status    Status    `json:"status"`
+	Error     string    `json:"error,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+
+	// sm enforces valid state transitions. Not serialized.
+	sm *StateMachine `json:"-"`
 }
 
 func newTransfer(peerID, peerName, filePath, fileName string, fileSize int64) *Transfer {
@@ -52,6 +57,7 @@ func newTransfer(peerID, peerName, filePath, fileName string, fileSize int64) *T
 		Status:    StatusPending,
 		CreatedAt: now,
 		UpdatedAt: now,
+		sm:        NewStateMachine(StatusPending),
 	}
 }
 
@@ -61,6 +67,7 @@ type Manager struct {
 	mu        sync.RWMutex
 	transfers map[string]*Transfer
 	maxActive int
+	CancelReg *CancelRegistry
 }
 
 func NewManager(maxActive int) *Manager {
@@ -70,6 +77,7 @@ func NewManager(maxActive int) *Manager {
 	return &Manager{
 		transfers: make(map[string]*Transfer),
 		maxActive: maxActive,
+		CancelReg: NewCancelRegistry(),
 	}
 }
 
@@ -120,7 +128,12 @@ func (m *Manager) UpdateStatus(id string, status Status, errMsg string) (*Transf
 	if !ok {
 		return nil, ErrNotFound
 	}
-	t.Status = status
+	if status != t.Status {
+		if err := t.sm.Transition(status); err != nil {
+			return nil, err
+		}
+		t.Status = status
+	}
 	t.UpdatedAt = time.Now()
 	if errMsg != "" {
 		t.Error = errMsg
@@ -150,6 +163,13 @@ func (m *Manager) Remove(id string) bool {
 	return false
 }
 
+// ActiveCount returns the number of transfers currently occupying a slot in
+// the max-concurrency budget. This MUST mirror the active-set used by Create,
+// otherwise Create could admit more transfers than ActiveCount reports, or
+// vice versa. Both functions use the same set: pending / connecting /
+// transferring. StatusAwaitingResume is a quiescent state and does not count
+// against the budget (a paused-but-resumable transfer is not actively
+// consuming a connection).
 func (m *Manager) ActiveCount() int {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -165,16 +185,21 @@ func (m *Manager) ActiveCount() int {
 
 func (m *Manager) Cancel(id string) (*Transfer, error) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	t, ok := m.transfers[id]
 	if !ok {
+		m.mu.Unlock()
 		return nil, ErrNotFound
 	}
-	if t.Status == StatusCompleted {
-		return nil, errors.New("transfer: cannot cancel completed transfer")
+	if err := t.sm.Transition(StatusCancelled); err != nil {
+		m.mu.Unlock()
+		return nil, fmt.Errorf("transfer: cancel: %w", err)
 	}
 	t.Status = StatusCancelled
 	t.UpdatedAt = time.Now()
+	m.mu.Unlock()
+
+	m.CancelReg.Cancel(id)
+
 	slog.Info("transfer cancelled", "id", id[:8])
 	return t, nil
 }

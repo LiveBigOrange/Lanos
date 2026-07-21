@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	stdnet "net"
+	"sync"
 	"time"
 
 	"github.com/flynn/noise"
@@ -87,9 +88,10 @@ func Dial(ctx context.Context, cfg DialConfig) (*EncryptedConn, error) {
 
 type EncryptedConn struct {
 	stdnet.Conn
-	sendCS *noise.CipherState
-	recvCS *noise.CipherState
-	buf    []byte
+	sendCS  *noise.CipherState
+	recvCS  *noise.CipherState
+	buf     []byte
+	writeMu sync.Mutex
 }
 
 func (ec *EncryptedConn) Read(b []byte) (int, error) {
@@ -108,13 +110,14 @@ func (ec *EncryptedConn) Read(b []byte) (int, error) {
 	}
 	n := copy(b, plain)
 	if n < len(plain) {
-		ec.buf = make([]byte, len(plain)-n)
-		copy(ec.buf, plain[n:])
+		ec.buf = plain[n:]
 	}
 	return n, nil
 }
 
 func (ec *EncryptedConn) Write(b []byte) (int, error) {
+	ec.writeMu.Lock()
+	defer ec.writeMu.Unlock()
 	ct, err := ec.sendCS.Encrypt(nil, nil, b)
 	if err != nil {
 		return 0, fmt.Errorf("net: encrypt: %w", err)

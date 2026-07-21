@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/device.dart';
 
 /// A single row representing a discovered device.
 ///
 /// Shows the platform icon, name, address and (for self) a "本机" badge.
-/// Tapping the card is a no-op in P1 W2; P1 W4 wires it to the send-file
-/// flow.
+/// The [onTap] callback triggers the send-file flow when provided.
 class DeviceCard extends StatelessWidget {
   const DeviceCard({
     super.key,
@@ -29,7 +29,8 @@ class DeviceCard extends StatelessWidget {
       child: ListTile(
         onTap: onTap,
         leading: CircleAvatar(
-          backgroundColor: isSelf ? cs.primaryContainer : cs.surfaceContainerHighest,
+          backgroundColor:
+              isSelf ? cs.primaryContainer : cs.surfaceContainerHighest,
           foregroundColor: isSelf ? cs.onPrimaryContainer : cs.onSurfaceVariant,
           child: Icon(iconForPlatform(device.platform)),
         ),
@@ -51,8 +52,9 @@ class DeviceCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
-                  '本机',
-                  style: theme.textTheme.labelSmall?.copyWith(color: cs.onPrimaryContainer),
+                  AppLocalizations.of(context)!.thisDevice,
+                  style: theme.textTheme.labelSmall
+                      ?.copyWith(color: cs.onPrimaryContainer),
                 ),
               ),
             ],
@@ -71,7 +73,8 @@ class DeviceCard extends StatelessWidget {
   String _subtitle() {
     final parts = <String>[];
     parts.add(labelForPlatform(device.platform));
-    if (device.primaryAddress.isNotEmpty && device.primaryAddress != device.hostname) {
+    if (device.primaryAddress.isNotEmpty &&
+        device.primaryAddress != device.hostname) {
       parts.add(device.primaryAddress);
     }
     return parts.join(' · ');

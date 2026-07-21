@@ -33,10 +33,10 @@ const ChunkSize = 4 << 20
 const MaxChunkSize = ChunkSize
 
 var (
-	ErrChunkIndex     = errors.New("transfer: chunk index out of range")
-	ErrChunkHash       = errors.New("transfer: chunk sha256 mismatch")
-	ErrChunkSizeWrong  = errors.New("transfer: chunk size mismatch")
-	ErrIncomplete      = errors.New("transfer: incomplete chunk set")
+	ErrChunkIndex       = errors.New("transfer: chunk index out of range")
+	ErrChunkHash        = errors.New("transfer: chunk sha256 mismatch")
+	ErrChunkSizeWrong   = errors.New("transfer: chunk size mismatch")
+	ErrIncomplete       = errors.New("transfer: incomplete chunk set")
 	ErrManifestMismatch = errors.New("transfer: manifest does not match received chunks")
 )
 
@@ -70,11 +70,11 @@ func ChunkHashHex(data []byte) string {
 // ChunkReader streams a file as 4 MiB chunks, computing each chunk's SHA256.
 // It is safe for single-goroutine sequential use.
 type ChunkReader struct {
-	f        *os.File
-	idx      int
+	f         *os.File
+	idx       int
 	remaining int64
-	total    int64
-	buf      []byte
+	total     int64
+	buf       []byte
 }
 
 // ChunkResult is one chunk yielded by ChunkReader.

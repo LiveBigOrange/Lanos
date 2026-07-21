@@ -9,9 +9,10 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -19,8 +20,11 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/lanos/lanos/core/config"
 	"github.com/lanos/lanos/core/discovery"
+	"github.com/lanos/lanos/core/receive"
 	"github.com/lanos/lanos/core/share"
 	"github.com/lanos/lanos/core/store"
+	"github.com/lanos/lanos/core/transfer"
+	"github.com/lanos/lanos/core/transport"
 )
 
 // Config bundles everything the Server needs at construction time.
@@ -32,6 +36,19 @@ type Config struct {
 	Discovery DeviceLister
 	// ShareManager handles web share lifecycle. If nil, /shares returns 503.
 	ShareManager *share.Manager
+	// SharePort is the port the share HTTP server listens on, used to build
+	// download URLs returned by POST /shares.
+	SharePort int
+	// TransferMgr manages outgoing file transfers. If nil, transfer-related
+	// live endpoints return 503.
+	TransferMgr *transfer.Manager
+	// ReceiveMgr manages incoming file transfer prompts. If nil, incoming
+	// endpoints return 503.
+	ReceiveMgr *receive.Manager
+	// StaticKeys is the local device's X25519 keypair derived from the
+	// ed25519 identity. Required for POST /transfers to initiate the Noise
+	// XX handshake when dialing a peer.
+	StaticKeys transport.StaticKeys
 	// EventSource feeds device presence events to the SSE /events stream. If
 	// nil, /events returns 503.
 	EventSource EventSource
@@ -50,8 +67,9 @@ type DeviceLister interface {
 
 // Server is the local REST API server bound to 127.0.0.1.
 type Server struct {
-	cfg Config
-	srv *http.Server
+	cfg    Config
+	srv    *http.Server
+	appCtx context.Context
 }
 
 // NewServer constructs the Server with all routes wired. The caller owns
@@ -75,6 +93,7 @@ func NewServer(cfg Config) *Server {
 		r.Get("/ping", s.handlePing)
 		r.Get("/version", s.handleVersion)
 		r.Get("/devices", s.handleDevices)
+		r.Get("/diagnostics", s.handleDiagnostics)
 		// SSE is a long-lived stream: it must NOT be subject to the 30s request
 		// timeout applied to the request/response routes below. Mount it before
 		// the Timeout middleware.
@@ -86,19 +105,32 @@ func NewServer(cfg Config) *Server {
 			r.Route("/shares", func(r chi.Router) {
 				r.Get("/", s.handleListShares)
 				r.Post("/", s.handleCreateShare)
+				r.Get("/history", s.handleListShareHistory)
+				r.Get("/export", s.handleExportShares)
 				r.Get("/{id}", s.handleGetShare)
 				r.Delete("/{id}", s.handleStopShare)
 			})
-			// Transfers (transfer log)
+			// Transfers (transfer log + initiate send)
 			r.Route("/transfers", func(r chi.Router) {
 				r.Get("/", s.handleListTransfers)
+				r.Post("/", s.handleCreateTransfer)
+				r.Get("/export", s.handleExportTransfers)
 				r.Get("/{id}", s.handleGetTransfer)
+				r.Post("/{id}/cancel", s.handleCancelTransfer)
 				r.Delete("/{id}", s.handleDeleteTransfer)
+			})
+			// Incoming transfer prompts
+			r.Route("/incoming", func(r chi.Router) {
+				r.Get("/", s.handleListIncoming)
+				r.Post("/{id}/accept", s.handleAcceptIncoming)
+				r.Post("/{id}/reject", s.handleRejectIncoming)
+				r.Post("/{id}/cancel", s.handleCancelIncoming)
 			})
 			// Settings
 			r.Route("/settings", func(r chi.Router) {
 				r.Get("/", s.handleGetSettings)
 				r.Put("/", s.handleUpdateSettings)
+				r.Post("/", s.handleUpdateSettings)
 			})
 		})
 	})
@@ -108,7 +140,11 @@ func NewServer(cfg Config) *Server {
 }
 
 // Serve blocks until the listener returns or ctx is canceled.
+// ctx is stored on s as the application-scoped context and used by background
+// goroutines spawned by HTTP handlers (e.g. async file transfers). These must
+// NOT use r.Context(), which is canceled the moment the handler returns.
 func (s *Server) Serve(ctx context.Context, ln net.Listener) error {
+	s.appCtx = ctx
 	errCh := make(chan error, 1)
 	go func() { errCh <- s.srv.Serve(ln) }()
 
@@ -169,10 +205,13 @@ func isExempt(r *http.Request) bool {
 }
 
 func isLocalhostOrigin(origin string) bool {
-	for _, prefix := range []string{"http://localhost", "http://127.0.0.1", "http://[::1]"} {
-		if strings.HasPrefix(origin, prefix) {
-			return true
-		}
+	u, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	switch u.Hostname() {
+	case "localhost", "127.0.0.1", "::1":
+		return true
 	}
 	return false
 }
@@ -229,6 +268,25 @@ func (s *Server) handleDevices(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleDiagnostics returns a snapshot of the local network stack for
+// debugging dual-stack / IPv6 reachability issues. The response includes
+// the detected IP version capability and per-interface addresses.
+//
+// Response shape:
+//
+//	{
+//	  "ip_version": "46" | "4" | "6",
+//	  "interfaces": [ InterfaceInfo, ... ],
+//	  "source_ips": [ "192.168.1.5", "fd00::5", ... ]
+//	}
+func (s *Server) handleDiagnostics(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ip_version": discovery.LocalIPVersion(),
+		"interfaces": discovery.Interfaces(),
+		"source_ips": discovery.LocalSourceIPs(),
+	})
+}
+
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -237,6 +295,3 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 		_ = err
 	}
 }
-
-// guard against forgetting a Config field somewhere in the future.
-var _ = fmt.Sprintf
