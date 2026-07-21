@@ -22,6 +22,13 @@ fi
 cd "$SCRIPT_DIR"
 mkdir -p "$OUTPUT_DIR"
 
+FLUTTER_BUNDLE="$PROJECT_ROOT/ui/build/linux/x64/release/bundle"
+GCD_BIN="$PROJECT_ROOT/core/gcd"
+
+echo "Flutter bundle: $FLUTTER_BUNDLE"
+echo "GCD binary: $GCD_BIN"
+ls -la "$FLUTTER_BUNDLE/" 2>/dev/null || echo "WARNING: Flutter bundle not found at $FLUTTER_BUNDLE"
+
 # --- AppImage ---
 echo "Building AppImage..."
 APPDIR="$OUTPUT_DIR/appimage/$APP_NAME.AppDir"
@@ -32,9 +39,9 @@ mkdir -p "$APPDIR/usr/share/icons/hicolor/256x256/apps"
 mkdir -p "$APPDIR/usr/share/metainfo"
 
 # Copy Flutter app
-cp -R ../../ui/build/linux/x64/release/bundle/* "$APPDIR/usr/bin/"
+cp -R "$FLUTTER_BUNDLE/"* "$APPDIR/usr/bin/" 2>/dev/null || echo "WARNING: Flutter bundle copy failed"
 # Copy Go core
-cp ../../core/gcd "$APPDIR/usr/bin/"
+cp "$GCD_BIN" "$APPDIR/usr/bin/"
 
 # Create desktop file (AppImage requires it in AppDir root)
 cat > "$APPDIR/$APP_NAME.desktop" << EOF
@@ -81,8 +88,8 @@ mkdir -p "$DEB_DIR/usr/share/icons/hicolor/256x256/apps"
 mkdir -p "$DEB_DIR/usr/share/doc/$APP_NAME"
 
 # Copy binaries
-cp ../../ui/build/linux/x64/release/bundle/lanos "$DEB_DIR/usr/bin/"
-cp ../../core/gcd "$DEB_DIR/usr/bin/"
+cp "$FLUTTER_BUNDLE/lanos" "$DEB_DIR/usr/bin/" 2>/dev/null || echo "WARNING: Flutter binary not found"
+cp "$GCD_BIN" "$DEB_DIR/usr/bin/"
 
 # Desktop file
 cp "$APPDIR/usr/share/applications/$APP_NAME.desktop" "$DEB_DIR/usr/share/applications/"
