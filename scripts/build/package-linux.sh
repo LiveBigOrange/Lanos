@@ -43,7 +43,12 @@ cp -R "$FLUTTER_BUNDLE/"* "$APPDIR/usr/bin/" 2>/dev/null || echo "WARNING: Flutt
 # Copy Go core
 cp "$GCD_BIN" "$APPDIR/usr/bin/"
 
-# Create desktop file (AppImage requires it in AppDir root)
+# Create placeholder icon (AppImage requires it)
+if command -v convert >/dev/null 2>&1; then
+    convert -size 256x256 xc:'#2196F3' "$APPDIR/$APP_NAME.png"
+else
+    printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82' > "$APPDIR/$APP_NAME.png"
+fi
 cat > "$APPDIR/$APP_NAME.desktop" << EOF
 [Desktop Entry]
 Name=Lanos
