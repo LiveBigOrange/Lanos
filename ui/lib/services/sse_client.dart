@@ -49,8 +49,7 @@ class SseClient {
           } else if (line.startsWith('data: ')) {
             if (currentData.isNotEmpty) currentData.write('\n');
             currentData.write(line.substring(6));
-          } else if (line.startsWith('id: ')) {
-            lastEventId = line.substring(4);
+
           } else if (line.isEmpty && currentEvent != null) {
             _controller.add(
               SseEvent(
