@@ -174,6 +174,8 @@ cp -a appimage/$APP_NAME.AppDir/usr/share/applications/* %{buildroot}/usr/share/
 %files
 /usr/bin/lanos
 /usr/bin/gcd
+/usr/bin/data
+/usr/bin/lib
 /usr/share/applications/lanos.desktop
 
 %changelog
