@@ -66,7 +66,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 Source: "$staging\app\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "$staging\core\gcd.exe"; DestDir: "{app}\core"; Flags: ignoreversion
+Source: "$staging\core\gcd.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\Lanos"; Filename: "{app}\lanos.exe"
