@@ -59,7 +59,9 @@ jobs:
           cache-dependency-path: core/go.sum
       - name: Build Flutter Windows
         working-directory: ui
-        run: flutter build windows --release
+        run: |
+          flutter pub get
+          flutter build windows --release
       - name: Build gcd
         working-directory: core
         run: go build -trimpath -ldflags="-s -w" -o gcd.exe ./cmd/gcd
@@ -126,7 +128,9 @@ jobs:
 
       - name: Build Flutter Linux
         working-directory: ui
-        run: flutter build linux --release
+        run: |
+          flutter pub get
+          flutter build linux --release
       - name: Build gcd
         working-directory: core
         run: CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o gcd ./cmd/gcd
