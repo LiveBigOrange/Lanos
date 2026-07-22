@@ -43,6 +43,16 @@ if (Test-Path $GcdExe) {
     Write-Error "gcd.exe not found at $GcdExe"
 }
 
+$portable = "$PSScriptRoot/$OutputDir/portable/Lanos"
+if (Test-Path $portable) { Remove-Item -Recurse -Force $portable }
+New-Item -ItemType Directory -Force -Path $portable | Out-Null
+
+Copy-Item -Recurse "$staging/app/*" $portable/
+Copy-Item "$staging/core/gcd.exe" $portable/
+
+Compress-Archive -Path $portable -DestinationPath "$PSScriptRoot/$OutputDir/Lanos-$Version-windows-portable.zip" -Force
+Write-Host "Created portable ZIP: $OutputDir/Lanos-$Version-windows-portable.zip"
+
 $iss = @"
 [Setup]
 AppName=Lanos
