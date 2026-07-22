@@ -39,7 +39,11 @@ class NotificationService {
       iOS: DarwinInitializationSettings(),
       macOS: DarwinInitializationSettings(),
       linux: LinuxInitializationSettings(defaultActionName: 'Open'),
-      windows: WindowsInitializationSettings(appUserModelId: 'Lanos'),
+      windows: WindowsInitializationSettings(
+        appName: 'Lanos',
+        appUserModelId: 'Lanos.Lanos',
+        guid: '{B5E0E1A2-3C4D-5E6F-8A9B-0C1D2E3F4A5B}',
+      ),
     );
     await _plugin.initialize(settings: initSettings);
     _initialized = true;
