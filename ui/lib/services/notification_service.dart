@@ -34,12 +34,11 @@ class NotificationService {
   /// startup; subsequent calls are no-ops.
   Future<void> init() async {
     if (_initialized) return;
-    final initSettings = InitializationSettings(
+    const initSettings = InitializationSettings(
       android: AndroidInitializationSettings('@mipmap/ic_launcher'),
       iOS: DarwinInitializationSettings(),
       macOS: DarwinInitializationSettings(),
       linux: LinuxInitializationSettings(defaultActionName: 'Open'),
-
     );
     await _plugin.initialize(settings: initSettings);
     _initialized = true;
