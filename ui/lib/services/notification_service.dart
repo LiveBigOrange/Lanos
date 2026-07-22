@@ -34,7 +34,7 @@ class NotificationService {
   /// startup; subsequent calls are no-ops.
   Future<void> init() async {
     if (_initialized) return;
-    const initSettings = InitializationSettings(
+    final initSettings = InitializationSettings(
       android: AndroidInitializationSettings('@mipmap/ic_launcher'),
       iOS: DarwinInitializationSettings(),
       macOS: DarwinInitializationSettings(),
