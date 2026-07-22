@@ -9,7 +9,7 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"io/fs"
+
 	"net"
 	"net/http"
 	"net/url"
@@ -147,16 +147,14 @@ func NewServer(cfg Config) *Server {
 }
 
 func (s *Server) handleWebUI(w http.ResponseWriter, r *http.Request) {
-	f, err := web.Assets.Open("index.html")
+	data, err := web.Assets.ReadFile("index.html")
 	if err != nil {
 		http.Error(w, "UI not found", http.StatusNotFound)
 		return
 	}
-	defer f.Close()
-	stat, _ := f.Stat()
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
-	http.ServeContent(w, r, "index.html", stat.ModTime(), f.(fs.ReadSeeker))
+	w.Write(data)
 }
 
 // Serve blocks until the listener returns or ctx is canceled.
