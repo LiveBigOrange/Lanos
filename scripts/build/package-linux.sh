@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# package-linux.sh — Builds Linux packages (AppImage, deb, rpm)
 set -euo pipefail
 
 VERSION="${1:-0.1.0}"
@@ -8,14 +7,12 @@ OUTPUT_DIR="dist"
 APP_NAME="lanos"
 
 SKIP_BUILD="${2:-}"
-echo "Building Lanos Linux packages v$VERSION"
+echo "Packaging Lanos Linux v$VERSION"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 if [ -z "$SKIP_BUILD" ]; then
-    cd "$PROJECT_ROOT/ui"
-    flutter build linux --release
     cd "$PROJECT_ROOT/core"
     CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o gcd ./cmd/gcd
 fi
@@ -23,65 +20,7 @@ fi
 cd "$SCRIPT_DIR"
 mkdir -p "$OUTPUT_DIR"
 
-FLUTTER_BUNDLE="$PROJECT_ROOT/ui/build/linux/x64/release/bundle"
 GCD_BIN="$PROJECT_ROOT/core/gcd"
-
-echo "Flutter bundle: $FLUTTER_BUNDLE"
-echo "GCD binary: $GCD_BIN"
-ls -la "$FLUTTER_BUNDLE/" 2>/dev/null || echo "WARNING: Flutter bundle not found at $FLUTTER_BUNDLE"
-
-# --- AppImage ---
-echo "Building AppImage..."
-APPDIR="$OUTPUT_DIR/appimage/$APP_NAME.AppDir"
-rm -rf "$APPDIR"
-mkdir -p "$APPDIR/usr/bin"
-mkdir -p "$APPDIR/usr/share/applications"
-mkdir -p "$APPDIR/usr/share/icons/hicolor/256x256/apps"
-mkdir -p "$APPDIR/usr/share/metainfo"
-
-# Copy Flutter app
-cp -R "$FLUTTER_BUNDLE/"* "$APPDIR/usr/bin/" 2>/dev/null || echo "WARNING: Flutter bundle copy failed"
-# Copy Go core
-cp "$GCD_BIN" "$APPDIR/usr/bin/"
-
-# Create placeholder icon (AppImage requires it)
-if command -v convert >/dev/null 2>&1; then
-    convert -size 256x256 xc:'#2196F3' "$APPDIR/$APP_NAME.png"
-else
-    printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82' > "$APPDIR/$APP_NAME.png"
-fi
-cat > "$APPDIR/$APP_NAME.desktop" << EOF
-[Desktop Entry]
-Name=Lanos
-Comment=Local network file sharing
-Exec=lanos
-Icon=lanos
-Type=Application
-Categories=Network;FileTransfer;
-MimeType=x-scheme-handler/lanos;
-EOF
-cp "$APPDIR/$APP_NAME.desktop" "$APPDIR/usr/share/applications/$APP_NAME.desktop"
-
-# Create AppRun
-cat > "$APPDIR/AppRun" << 'EOF'
-#!/bin/sh
-HERE="$(dirname "$(readlink -f "$0")")"
-export PATH="$HERE/usr/bin:$PATH"
-export LD_LIBRARY_PATH="$HERE/usr/lib:$LD_LIBRARY_PATH"
-exec "$HERE/usr/bin/lanos" "$@"
-EOF
-chmod +x "$APPDIR/AppRun"
-
-# Download appimagetool if not present
-if ! command -v appimagetool >/dev/null; then
-    wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O /tmp/appimagetool
-    chmod +x /tmp/appimagetool
-    APPIMAGETOOL=/tmp/appimagetool
-else
-    APPIMAGETOOL=appimagetool
-fi
-
-ARCH=x86_64 $APPIMAGETOOL "$APPDIR" "$OUTPUT_DIR/Lanos-$VERSION-x86_64.AppImage"
 
 # --- deb ---
 echo "Building deb..."
@@ -90,41 +29,32 @@ rm -rf "$DEB_DIR"
 mkdir -p "$DEB_DIR/DEBIAN"
 mkdir -p "$DEB_DIR/usr/bin"
 mkdir -p "$DEB_DIR/usr/share/applications"
-mkdir -p "$DEB_DIR/usr/share/icons/hicolor/256x256/apps"
 mkdir -p "$DEB_DIR/usr/share/doc/$APP_NAME"
 
-# Copy binaries
-cp "$FLUTTER_BUNDLE/lanos" "$DEB_DIR/usr/bin/" 2>/dev/null || echo "WARNING: Flutter binary not found"
 cp "$GCD_BIN" "$DEB_DIR/usr/bin/"
 
-# Desktop file
-cp "$APPDIR/usr/share/applications/$APP_NAME.desktop" "$DEB_DIR/usr/share/applications/"
+cat > "$DEB_DIR/usr/share/applications/$APP_NAME.desktop" << EOF
+[Desktop Entry]
+Name=Lanos
+Comment=Secure P2P file transfer over LAN
+Exec=gcd
+Type=Application
+Categories=Network;FileTransfer;
+Terminal=false
+EOF
 
-# Control file
 cat > "$DEB_DIR/DEBIAN/control" << EOF
 Package: $APP_NAME
 Version: $VERSION
 Section: net
 Priority: optional
 Architecture: amd64
-Depends: avahi-daemon, libgtk-3-0, libblkid1, liblzma5
+Depends: avahi-daemon
 Maintainer: Lanos Team <team@lanos.app>
-Description: Local network file sharing tool
- Lanos is a zero-config, cross-platform, secure file sharing tool
- for local networks. Share files between Windows, macOS, Linux,
- Android, and iOS devices without internet.
+Description: Secure P2P file transfer over LAN
+ Lanos is a zero-config, secure file sharing tool for local networks.
+ It uses Noise Protocol encryption and mDNS discovery.
 EOF
-
-# Postinst script (firewall setup hint)
-cat > "$DEB_DIR/DEBIAN/postinst" << 'EOF'
-#!/bin/sh
-set -e
-if command -v ufw >/dev/null 2>&1; then
-    echo "Lanos: To allow LAN connections, run:"
-    echo "  sudo /usr/share/lanos/lanos-setup-firewall.sh"
-fi
-EOF
-chmod 755 "$DEB_DIR/DEBIAN/postinst"
 
 dpkg-deb --build "$DEB_DIR" "$OUTPUT_DIR/lanos_${VERSION}_amd64.deb"
 
@@ -140,42 +70,40 @@ mkdir -p "$RPM_DIR/SRPMS"
 
 RPM_TOPDIR="$(cd "$RPM_DIR" && pwd)"
 
-# Create source tarball
-TARBALL="$RPM_DIR/SOURCES/lanos-$VERSION.tar.gz"
-tar -czf "$TARBALL" -C "$OUTPUT_DIR" "appimage/$APP_NAME.AppDir"
+mkdir -p "$RPM_DIR/BUILD/lanos-$VERSION/usr/bin"
+mkdir -p "$RPM_DIR/BUILD/lanos-$VERSION/usr/share/applications"
+cp "$GCD_BIN" "$RPM_DIR/BUILD/lanos-$VERSION/usr/bin/"
+cp "$DEB_DIR/usr/share/applications/$APP_NAME.desktop" "$RPM_DIR/BUILD/lanos-$VERSION/usr/share/applications/"
 
-# Create spec file
+tar -czf "$RPM_DIR/SOURCES/lanos-$VERSION.tar.gz" -C "$RPM_DIR/BUILD" "lanos-$VERSION"
+
 cat > "$RPM_DIR/SPECS/lanos.spec" << EOF
 Name:           lanos
 Version:        $VERSION
 Release:        1%{?dist}
-Summary:        Local network file sharing tool
+Summary:        Secure P2P file transfer over LAN
 
 License:        MIT
-URL:            https://lanos.app
+URL:            https://github.com/LiveBigOrange/Lanos
 Source0:        %{name}-%{version}.tar.gz
 
-Requires:       avahi, gtk3
+Requires:       avahi
 
 %description
-Lanos is a zero-config, cross-platform, secure file sharing tool
-for local networks.
+Lanos is a zero-config, secure file sharing tool for local networks.
 
 %prep
-%setup -q -c
+%setup -q
 
 %install
 rm -rf %{buildroot}
 mkdir -p %{buildroot}/usr/bin
 mkdir -p %{buildroot}/usr/share/applications
-cp -a appimage/$APP_NAME.AppDir/usr/bin/* %{buildroot}/usr/bin/
-cp -a appimage/$APP_NAME.AppDir/usr/share/applications/* %{buildroot}/usr/share/applications/
+cp -a usr/bin/* %{buildroot}/usr/bin/
+cp -a usr/share/applications/* %{buildroot}/usr/share/applications/
 
 %files
-/usr/bin/lanos
 /usr/bin/gcd
-/usr/bin/data
-/usr/bin/lib
 /usr/share/applications/lanos.desktop
 
 %changelog

@@ -445,4 +445,32 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get thisDevice => 'This device';
+
+  @override
+  String get fileReceiveComplete => 'File received';
+
+  @override
+  String fileReceiveCompleteN(Object count) {
+    return '$count files received';
+  }
+
+  @override
+  String fileReceiveAndMore(Object count, Object first5) {
+    return '$first5 and $count more';
+  }
+
+  @override
+  String get etaComplete => 'Done';
+
+  @override
+  String get shareStatusActive => 'Active';
+
+  @override
+  String get shareStatusExpired => 'Expired';
+
+  @override
+  String get shareStatusStopped => 'Stopped';
+
+  @override
+  String get shareStatusCompleted => 'Completed';
 }

@@ -26,10 +26,14 @@ ui/windows/flutter/ephemeral/
 # IDE
 .idea/
 .vscode/
+.vs/
 *.iml
 *.swp
 .DS_Store
 Thumbs.db
+
+# Build logs
+build_log*.txt
 
 # CodeArts / AI agent
 .arts/

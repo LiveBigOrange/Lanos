@@ -883,6 +883,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This device'**
   String get thisDevice;
+
+  /// No description provided for @fileReceiveComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'File received'**
+  String get fileReceiveComplete;
+
+  /// No description provided for @fileReceiveCompleteN.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} files received'**
+  String fileReceiveCompleteN(Object count);
+
+  /// No description provided for @fileReceiveAndMore.
+  ///
+  /// In en, this message translates to:
+  /// **'{first5} and {count} more'**
+  String fileReceiveAndMore(Object count, Object first5);
+
+  /// No description provided for @etaComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get etaComplete;
+
+  /// No description provided for @shareStatusActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get shareStatusActive;
+
+  /// No description provided for @shareStatusExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Expired'**
+  String get shareStatusExpired;
+
+  /// No description provided for @shareStatusStopped.
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped'**
+  String get shareStatusStopped;
+
+  /// No description provided for @shareStatusCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get shareStatusCompleted;
 }
 
 class _AppLocalizationsDelegate

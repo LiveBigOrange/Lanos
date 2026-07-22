@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lanos</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a0b;--surface:#141416;--surface2:#1c1c1f;--border:#2a2a2e;
+  --text:#e4e4e7;--text2:#a1a1aa;--text3:#71717a;
+  --accent:#6366f1;--accent2:#818cf8;--accent-bg:rgba(99,102,241,.12);
+  --green:#22c55e;--green-bg:rgba(34,197,94,.12);
+  --red:#ef4444;--red-bg:rgba(239,68,68,.12);
+  --yellow:#eab308;--yellow-bg:rgba(234,179,8,.12);
+  --radius:10px;--radius-sm:6px;
+}
+html{font-size:14px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+a{color:var(--accent2);text-decoration:none}
+button{font:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select{font:inherit;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px;outline:none;transition:border .2s}
+input:focus,select:focus{border-color:var(--accent)}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* Layout */
+.app{display:flex;height:100vh}
+.sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:16px 0;flex-shrink:0}
+.sidebar-logo{padding:0 20px 20px;font-size:1.3rem;font-weight:700;letter-spacing:-.5px;display:flex;align-items:center;gap:8px}
+.sidebar-logo svg{width:24px;height:24px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 20px;color:var(--text2);transition:all .15s;cursor:pointer;font-size:.92rem;border-left:2px solid transparent}
+.nav-item:hover{color:var(--text);background:var(--surface2)}
+.nav-item.active{color:var(--accent2);background:var(--accent-bg);border-left-color:var(--accent)}
+.nav-item svg{width:18px;height:18px;opacity:.7}
+.nav-item.active svg{opacity:1}
+.sidebar-footer{margin-top:auto;padding:16px 20px;border-top:1px solid var(--border);font-size:.8rem;color:var(--text3)}
+.main{flex:1;overflow-y:auto;padding:32px 40px;max-width:960px}
+.page-title{font-size:1.5rem;font-weight:700;margin-bottom:24px;letter-spacing:-.3px}
+
+/* Cards */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px;transition:border .2s}
+.card:hover{border-color:var(--accent)}
+.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.card-title{font-weight:600;font-size:1rem}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--radius-sm);font-weight:500;font-size:.88rem;transition:all .15s}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent2)}
+.btn-ghost{color:var(--text2);border:1px solid var(--border)}
+.btn-ghost:hover{color:var(--text);border-color:var(--text3)}
+.btn-danger{color:var(--red);border:1px solid var(--red)}
+.btn-danger:hover{background:var(--red-bg)}
+.btn-sm{padding:5px 10px;font-size:.8rem}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* Badge */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:99px;font-size:.75rem;font-weight:500}
+.badge-green{background:var(--green-bg);color:var(--green)}
+.badge-red{background:var(--red-bg);color:var(--red)}
+.badge-yellow{background:var(--yellow-bg);color:var(--yellow)}
+.badge-blue{background:var(--accent-bg);color:var(--accent2)}
+.badge-gray{background:var(--surface2);color:var(--text3)}
+
+/* Device list */
+.device-card{display:flex;align-items:center;gap:16px}
+.device-icon{width:40px;height:40px;border-radius:var(--radius-sm);background:var(--accent-bg);display:flex;align-items:center;justify-content:center}
+.device-icon svg{width:20px;height:20px;color:var(--accent2)}
+.device-info{flex:1;min-width:0}
+.device-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.device-meta{font-size:.8rem;color:var(--text3);margin-top:2px}
+
+/* Transfer */
+.transfer-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
+.transfer-row:last-child{border-bottom:none}
+.transfer-info{flex:1;min-width:0}
+.transfer-name{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.transfer-meta{font-size:.8rem;color:var(--text3);margin-top:2px}
+.progress-bar{height:4px;background:var(--surface2);border-radius:2px;overflow:hidden;margin-top:6px}
+.progress-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .3s}
+.progress-fill.complete{background:var(--green)}
+
+/* Empty state */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;color:var(--text3);text-align:center}
+.empty svg{width:48px;height:48px;margin-bottom:16px;opacity:.4}
+.empty p{margin-top:8px;font-size:.9rem}
+
+/* Incoming prompt */
+.prompt-card{border-color:var(--yellow)}
+.prompt-card .card-title{color:var(--yellow)}
+.prompt-actions{display:flex;gap:8px;margin-top:12px}
+
+/* Settings */
+.setting-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}
+.setting-row:last-child{border-bottom:none}
+.setting-label{font-weight:500}
+.setting-desc{font-size:.8rem;color:var(--text3);margin-top:2px}
+
+/* Toast */
+.toast-container{position:fixed;bottom:20px;right:20px;z-index:999;display:flex;flex-direction:column;gap:8px}
+.toast{padding:12px 16px;border-radius:var(--radius-sm);background:var(--surface2);border:1px solid var(--border);font-size:.88rem;animation:slideIn .2s;max-width:360px}
+.toast-error{border-color:var(--red);color:var(--red)}
+.toast-success{border-color:var(--green);color:var(--green)}
+@keyframes slideIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* Responsive */
+@media(max-width:768px){
+  .app{flex-direction:column}
+  .sidebar{width:100%;flex-direction:row;overflow-x:auto;padding:8px;border-right:none;border-bottom:1px solid var(--border)}
+  .sidebar-logo{padding:0 12px 0 8px;border:none}
+  .sidebar-footer{display:none}
+  .nav-item{padding:8px 12px;border-left:none;border-bottom:2px solid transparent;white-space:nowrap}
+  .nav-item.active{border-left:none;border-bottom-color:var(--accent)}
+  .main{padding:20px 16px}
+}
+
+/* File input */
+.file-input-wrap{position:relative;display:inline-flex}
+.file-input-wrap input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="sidebar">
+    <div class="sidebar-logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      Lanos
+    </div>
+    <div class="nav-item active" data-page="devices" onclick="showPage('devices')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      设备
+    </div>
+    <div class="nav-item" data-page="transfers" onclick="showPage('transfers')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      传输
+    </div>
+    <div class="nav-item" data-page="incoming" onclick="showPage('incoming')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      接收
+    </div>
+    <div class="nav-item" data-page="settings" onclick="showPage('settings')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      设置
+    </div>
+    <div class="sidebar-footer" id="version-info"></div>
+  </nav>
+
+  <main class="main">
+    <!-- Devices Page -->
+    <div id="page-devices" class="page">
+      <h1 class="page-title">设备</h1>
+      <div id="self-device" class="card"></div>
+      <h2 style="font-size:1rem;color:var(--text2);margin:20px 0 12px">附近设备</h2>
+      <div id="peer-list"></div>
+    </div>
+
+    <!-- Transfers Page -->
+    <div id="page-transfers" class="page" style="display:none">
+      <h1 class="page-title">传输</h1>
+      <div id="transfer-list"></div>
+    </div>
+
+    <!-- Incoming Page -->
+    <div id="page-incoming" class="page" style="display:none">
+      <h1 class="page-title">接收</h1>
+      <div id="incoming-list"></div>
+    </div>
+
+    <!-- Settings Page -->
+    <div id="page-settings" class="page" style="display:none">
+      <h1 class="page-title">设置</h1>
+      <div id="settings-form" class="card"></div>
+    </div>
+  </main>
+</div>
+
+<div class="toast-container" id="toasts"></div>
+
+<script>
+const API = '';
+let TOKEN = '';
+let devicesPollTimer = null;
+let transferPollTimer = null;
+let incomingPollTimer = null;
+
+// --- API helpers ---
+async function api(path, opts = {}) {
+  const headers = { 'Authorization': 'Bearer ' + TOKEN };
+  if (opts.body && typeof opts.body === 'object' && !(opts.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(opts.body);
+  }
+  const res = await fetch(API + path, { ...opts, headers: { ...headers, ...opts.headers } });
+  if (res.status === 204) return null;
+  const text = await res.text();
+  if (!res.ok) {
+    let msg = res.statusText;
+    try { const j = JSON.parse(text); msg = j.error?.message || j.error?.code || msg; } catch {}
+    throw new Error(msg);
+  }
+  return text ? JSON.parse(text) : null;
+}
+
+// --- Toast ---
+function toast(msg, type = '') {
+  const el = document.createElement('div');
+  el.className = 'toast' + (type ? ' toast-' + type : '');
+  el.textContent = msg;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+// --- Navigation ---
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const page = document.getElementById('page-' + name);
+  if (page) page.style.display = '';
+  const nav = document.querySelector(`.nav-item[data-page="${name}"]`);
+  if (nav) nav.classList.add('active');
+  if (name === 'devices') refreshDevices();
+  if (name === 'transfers') refreshTransfers();
+  if (name === 'incoming') refreshIncoming();
+  if (name === 'settings') refreshSettings();
+}
+
+// --- Format helpers ---
+function formatBytes(b) {
+  if (b === 0) return '0 B';
+  const k = 1024, s = ['B','KB','MB','GB','TB'];
+  const i = Math.floor(Math.log(b) / Math.log(k));
+  return (b / Math.pow(k, i)).toFixed(1) + ' ' + s[i];
+}
+
+function formatSpeed(bps) {
+  return formatBytes(bps) + '/s';
+}
+
+function formatDuration(sec) {
+  if (!sec || sec < 0) return '--';
+  const m = Math.floor(sec / 60), s = Math.floor(sec % 60);
+  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+}
+
+function statusBadge(status) {
+  const map = {
+    pending: ['等待中', 'badge-yellow'],
+    connecting: ['连接中', 'badge-blue'],
+    transferring: ['传输中', 'badge-blue'],
+    completed: ['已完成', 'badge-green'],
+    cancelled: ['已取消', 'badge-gray'],
+    failed: ['失败', 'badge-red'],
+    awaiting_resume: ['等待恢复', 'badge-yellow'],
+    prompting: ['等待确认', 'badge-yellow'],
+    accepting: ['接受中', 'badge-blue'],
+    receiving: ['接收中', 'badge-blue'],
+    rejected: ['已拒绝', 'badge-gray'],
+    expired: ['已过期', 'badge-gray'],
+  };
+  const [label, cls] = map[status] || [status, 'badge-gray'];
+  return `<span class="badge ${cls}">${label}</span>`;
+}
+
+function timeAgo(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  const now = new Date();
+  const diff = (now - d) / 1000;
+  if (diff < 60) return '刚刚';
+  if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前';
+  if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前';
+  return d.toLocaleDateString();
+}
+
+// --- Devices ---
+async function refreshDevices() {
+  try {
+    const data = await api('/api/v1/devices');
+    renderSelfDevice(data.self || {});
+    renderPeers(data.peers || []);
+  } catch (e) {
+    toast('获取设备列表失败: ' + e.message, 'error');
+  }
+}
+
+function renderSelfDevice(self) {
+  const el = document.getElementById('self-device');
+  el.innerHTML = `
+    <div class="device-card">
+      <div class="device-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      </div>
+      <div class="device-info">
+        <div class="device-name">${esc(self.name || '本机')}</div>
+        <div class="device-meta">${esc(self.hostname || '')} · 端口 ${self.port || '-'} · ${self.ip_version || ''}</div>
+      </div>
+      <span class="badge badge-green">本机</span>
+    </div>`;
+}
+
+function renderPeers(peers) {
+  const el = document.getElementById('peer-list');
+  if (!peers.length) {
+    el.innerHTML = `<div class="empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <p>未发现附近设备</p>
+      <p style="font-size:.8rem">确保其他设备运行了 Lanos 并在同一局域网</p>
+    </div>`;
+    return;
+  }
+  el.innerHTML = peers.map(p => `
+    <div class="card">
+      <div class="device-card">
+        <div class="device-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        </div>
+        <div class="device-info">
+          <div class="device-name">${esc(p.name || '未知设备')}</div>
+          <div class="device-meta">${esc(p.hostname || '')} · ${p.ip_version || ''}</div>
+        </div>
+        <div class="file-input-wrap">
+          <button class="btn btn-primary btn-sm" onclick="this.nextElementSibling.click()">发送文件</button>
+          <input type="file" multiple onchange="sendFiles('${p.id}', this.files)">
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+// --- Send files ---
+async function sendFiles(peerId, files) {
+  if (!files || !files.length) return;
+  for (const f of files) {
+    try {
+      await api('/api/v1/transfers', {
+        method: 'POST',
+        body: { peer_id: peerId, file_path: f.name }
+      });
+      toast(`已添加发送任务: ${f.name}`, 'success');
+    } catch (e) {
+      toast(`发送失败 [${f.name}]: ${e.message}`, 'error');
+    }
+  }
+  showPage('transfers');
+}
+
+// --- Transfers ---
+async function refreshTransfers() {
+  try {
+    const data = await api('/api/v1/transfers');
+    renderTransfers(data || []);
+  } catch (e) {
+    toast('获取传输列表失败: ' + e.message, 'error');
+  }
+}
+
+function renderTransfers(transfers) {
+  const el = document.getElementById('transfer-list');
+  if (!transfers.length) {
+    el.innerHTML = `<div class="empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <p>暂无传输任务</p>
+    </div>`;
+    return;
+  }
+  el.innerHTML = transfers.map(t => {
+    const pct = t.bytes_total > 0 ? Math.round(t.bytes_transferred / t.bytes_total * 100) : 0;
+    const isDone = t.status === 'completed';
+    const isActive = ['pending','connecting','transferring'].includes(t.status);
+    return `
+    <div class="card">
+      <div class="transfer-row">
+        <div class="transfer-info">
+          <div class="transfer-name">${esc(t.file_name || t.id)}</div>
+          <div class="transfer-meta">
+            ${esc(t.peer_name || t.peer_id || '')} · ${formatBytes(t.bytes_transferred || 0)} / ${formatBytes(t.bytes_total || 0)}
+            ${t.speed ? ' · ' + formatSpeed(t.speed) : ''}
+            ${t.eta ? ' · ' + formatDuration(t.eta) : ''}
+            · ${timeAgo(t.created_at)}
+          </div>
+          ${isActive ? `<div class="progress-bar"><div class="progress-fill${isDone ? ' complete' : ''}" style="width:${pct}%"></div></div>` : ''}
+        </div>
+        ${statusBadge(t.status)}
+        ${isActive ? `<button class="btn btn-ghost btn-sm" onclick="cancelTransfer('${t.id}')">取消</button>` : ''}
+        ${isDone ? `<button class="btn btn-ghost btn-sm" onclick="deleteTransfer('${t.id}')">删除</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function cancelTransfer(id) {
+  try {
+    await api(`/api/v1/transfers/${id}/cancel`, { method: 'POST' });
+    toast('已取消传输', 'success');
+    refreshTransfers();
+  } catch (e) { toast('取消失败: ' + e.message, 'error'); }
+}
+
+async function deleteTransfer(id) {
+  try {
+    await api(`/api/v1/transfers/${id}`, { method: 'DELETE' });
+    refreshTransfers();
+  } catch (e) { toast('删除失败: ' + e.message, 'error'); }
+}
+
+// --- Incoming ---
+async function refreshIncoming() {
+  try {
+    const data = await api('/api/v1/incoming');
+    renderIncoming(data || []);
+  } catch (e) {
+    toast('获取接收列表失败: ' + e.message, 'error');
+  }
+}
+
+function renderIncoming(items) {
+  const el = document.getElementById('incoming-list');
+  if (!items.length) {
+    el.innerHTML = `<div class="empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <p>暂无待接收文件</p>
+    </div>`;
+    return;
+  }
+  el.innerHTML = items.map(item => `
+    <div class="card prompt-card">
+      <div class="card-header">
+        <span class="card-title">${esc(item.file_name || '未知文件')}</span>
+        ${statusBadge(item.status)}
+      </div>
+      <div style="font-size:.88rem;color:var(--text2)">
+        来自: ${esc(item.peer_name || '未知')} · 大小: ${formatBytes(item.file_size || 0)}
+      </div>
+      ${item.status === 'prompting' ? `
+      <div class="prompt-actions">
+        <button class="btn btn-primary btn-sm" onclick="acceptIncoming('${item.id}')">接收</button>
+        <button class="btn btn-danger btn-sm" onclick="rejectIncoming('${item.id}')">拒绝</button>
+      </div>` : ''}
+      ${item.status === 'receiving' ? `<div class="progress-bar" style="margin-top:8px"><div class="progress-fill" style="width:${item.bytes_received && item.file_size ? Math.round(item.bytes_received/item.file_size*100) : 0}%"></div></div>` : ''}
+    </div>`).join('');
+}
+
+async function acceptIncoming(id) {
+  try {
+    await api(`/api/v1/incoming/${id}/accept`, {
+      method: 'POST',
+      body: { save_path: '' }
+    });
+    toast('已开始接收', 'success');
+    refreshIncoming();
+  } catch (e) { toast('接收失败: ' + e.message, 'error'); }
+}
+
+async function rejectIncoming(id) {
+  try {
+    await api(`/api/v1/incoming/${id}/reject`, { method: 'POST' });
+    toast('已拒绝', 'success');
+    refreshIncoming();
+  } catch (e) { toast('拒绝失败: ' + e.message, 'error'); }
+}
+
+// --- Settings ---
+async function refreshSettings() {
+  try {
+    const data = await api('/api/v1/settings');
+    renderSettings(data || {});
+  } catch (e) {
+    toast('获取设置失败: ' + e.message, 'error');
+  }
+}
+
+function renderSettings(s) {
+  const el = document.getElementById('settings-form');
+  el.innerHTML = `
+    <div class="setting-row">
+      <div><div class="setting-label">设备名称</div><div class="setting-desc">在局域网中显示的名称</div></div>
+      <input id="s-device-name" value="${esc(s.device_name || '')}" style="width:200px">
+    </div>
+    <div class="setting-row">
+      <div><div class="setting-label">下载目录</div><div class="setting-desc">接收文件的保存位置</div></div>
+      <input id="s-download-dir" value="${esc(s.download_dir || '')}" style="width:280px">
+    </div>
+    <div style="margin-top:16px">
+      <button class="btn btn-primary" onclick="saveSettings()">保存设置</button>
+    </div>`;
+}
+
+async function saveSettings() {
+  try {
+    await api('/api/v1/settings', {
+      method: 'POST',
+      body: {
+        device_name: document.getElementById('s-device-name').value,
+        download_dir: document.getElementById('s-download-dir').value,
+      }
+    });
+    toast('设置已保存', 'success');
+  } catch (e) { toast('保存失败: ' + e.message, 'error'); }
+}
+
+// --- Escape ---
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// --- Polling ---
+function startPolling() {
+  refreshDevices();
+  refreshTransfers();
+  refreshIncoming();
+  devicesPollTimer = setInterval(refreshDevices, 5000);
+  transferPollTimer = setInterval(refreshTransfers, 2000);
+  incomingPollTimer = setInterval(refreshIncoming, 3000);
+}
+
+function stopPolling() {
+  clearInterval(devicesPollTimer);
+  clearInterval(transferPollTimer);
+  clearInterval(incomingPollTimer);
+}
+
+// --- Init ---
+async function init() {
+  TOKEN = new URLSearchParams(location.search).get('token') || '';
+  if (!TOKEN) {
+    const hash = location.hash;
+    if (hash.startsWith('#')) {
+      try { TOKEN = JSON.parse(atob(hash.slice(1))).token; } catch {}
+    }
+  }
+  if (!TOKEN) {
+    document.querySelector('.main').innerHTML = `<div class="empty"><p>缺少认证令牌</p><p style="font-size:.8rem">请通过 Lanos 应用打开此页面</p></div>`;
+    return;
+  }
+  try {
+    const v = await api('/api/v1/version');
+    document.getElementById('version-info').textContent = 'Lanos v' + (v.version || '');
+  } catch {}
+  startPolling();
+}
+
+init();
+</script>
+</body>
+</html>

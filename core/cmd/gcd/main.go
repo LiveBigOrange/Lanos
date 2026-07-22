@@ -19,6 +19,7 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"os/exec"
 	"os/signal"
 	"runtime"
 	"syscall"
@@ -188,11 +189,34 @@ func run() error {
 		EventSource:  disc,
 	})
 
-	// 8. Handshake: emit JSON to stdout for Flutter to read.
+	// 8. Handshake: emit JSON to stdout for the launcher to read.
 	if err := lifecycle.EmitHandshake(port, token, version); err != nil {
 		return fmt.Errorf("emit handshake: %w", err)
 	}
 
-	// 9. Serve until shutdown.
+	// 9. Open Web UI in default browser.
+	uiURL := fmt.Sprintf("http://127.0.0.1:%d/ui?token=%s", port, token)
+	go openBrowser(uiURL)
+
+	// 10. Serve until shutdown.
 	return srv.Serve(ctx, listener)
+}
+
+func openBrowser(url string) {
+	var cmd string
+	var args []string
+	switch runtime.GOOS {
+	case "windows":
+		cmd = "rundll32"
+		args = []string{"url.dll,FileProtocolHandler", url}
+	case "darwin":
+		cmd = "open"
+		args = []string{url}
+	default:
+		cmd = "xdg-open"
+		args = []string{url}
+	}
+	if err := exec.Command(cmd, args...).Start(); err != nil {
+		fmt.Fprintf(os.Stderr, "gcd: warn: open browser: %v\n", err)
+	}
 }

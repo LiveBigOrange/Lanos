@@ -9,7 +9,7 @@ package api
 import (
 	"context"
 	"encoding/json"
-
+	"io/fs"
 	"net"
 	"net/http"
 	"net/url"
@@ -25,6 +25,7 @@ import (
 	"github.com/lanos/lanos/core/store"
 	"github.com/lanos/lanos/core/transfer"
 	"github.com/lanos/lanos/core/transport"
+	"github.com/lanos/lanos/core/web"
 )
 
 // Config bundles everything the Server needs at construction time.
@@ -84,6 +85,12 @@ func NewServer(cfg Config) *Server {
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.RequestID)
+
+	// Web UI: serve embedded SPA at /ui/. The page receives the API token
+	// via query param (?token=...) so it can call authenticated endpoints.
+	r.Get("/ui", s.handleWebUI)
+	r.Get("/ui/", s.handleWebUI)
+
 	r.Use(s.bearerAuth)
 	r.Use(s.corsGuard)
 
@@ -137,6 +144,19 @@ func NewServer(cfg Config) *Server {
 
 	s.srv = &http.Server{Handler: r}
 	return s
+}
+
+func (s *Server) handleWebUI(w http.ResponseWriter, r *http.Request) {
+	f, err := web.Assets.Open("index.html")
+	if err != nil {
+		http.Error(w, "UI not found", http.StatusNotFound)
+		return
+	}
+	defer f.Close()
+	stat, _ := f.Stat()
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache")
+	http.ServeContent(w, r, "index.html", stat.ModTime(), f.(fs.ReadSeeker))
 }
 
 // Serve blocks until the listener returns or ctx is canceled.

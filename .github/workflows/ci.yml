@@ -3,7 +3,6 @@ name: CI
 on:
   push:
     branches: [main, master]
-
   pull_request:
     branches: [main, master]
 
@@ -27,21 +26,3 @@ jobs:
       - run: go vet ./...
       - run: go test -race -timeout 120s ./...
       - run: test -z "$(gofmt -l .)"
-
-  flutter-lint-test:
-    name: Flutter analyze + test
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ui
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-      - run: flutter pub get
-      - run: dart format lib test
-      - run: flutter analyze --fatal-infos
-      - run: flutter test
-

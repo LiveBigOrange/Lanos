@@ -438,4 +438,32 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get thisDevice => '本机';
+
+  @override
+  String get fileReceiveComplete => '文件接收完成';
+
+  @override
+  String fileReceiveCompleteN(Object count) {
+    return '$count 个文件接收完成';
+  }
+
+  @override
+  String fileReceiveAndMore(Object count, Object first5) {
+    return '$first5 等 $count 个';
+  }
+
+  @override
+  String get etaComplete => '完成';
+
+  @override
+  String get shareStatusActive => '进行中';
+
+  @override
+  String get shareStatusExpired => '已过期';
+
+  @override
+  String get shareStatusStopped => '已停止';
+
+  @override
+  String get shareStatusCompleted => '已完成';
 }

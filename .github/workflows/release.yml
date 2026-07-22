@@ -8,16 +8,16 @@ permissions:
   contents: write
 
 jobs:
-  build-core:
-    name: Build gcd (${{ matrix.os }}/${{ matrix.arch }})
+  build-gcd:
+    name: Build gcd (${{ matrix.target }})
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-22.04, target: linux-amd64,  goos: linux,   goarch: amd64 }
-          - { os: ubuntu-22.04, target: linux-arm64,  goos: linux,   goarch: arm64 }
-
+          - { os: ubuntu-22.04, target: linux-amd64, goos: linux, goarch: amd64 }
+          - { os: ubuntu-22.04, target: linux-arm64, goos: linux, goarch: arm64 }
           - { os: windows-2022, target: windows-amd64, goos: windows, goarch: amd64 }
+          - { os: macos-13, target: darwin-universal, goos: darwin, goarch: universal }
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -36,7 +36,13 @@ jobs:
         run: |
           ext=""
           if [ "$GOOS" = "windows" ]; then ext=".exe"; fi
-          go build -trimpath -ldflags="-s -w" -o gcd${ext} ./cmd/gcd
+          if [ "$GOARCH" = "universal" ]; then
+            GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o gcd-amd64${ext} ./cmd/gcd
+            GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o gcd-arm64${ext} ./cmd/gcd
+            lipo -create -output gcd${ext} gcd-amd64${ext} gcd-arm64${ext}
+          else
+            go build -trimpath -ldflags="-s -w" -o gcd${ext} ./cmd/gcd
+          fi
           mkdir -p out
           tar -czf out/gcd-${{ matrix.target }}.tar.gz gcd${ext}
         shell: bash
@@ -45,95 +51,51 @@ jobs:
           name: gcd-${{ matrix.target }}
           path: core/out/gcd-${{ matrix.target }}.tar.gz
 
-  build-windows:
-    name: Build Windows installer
+  package-windows:
+    name: Package Windows
+    needs: [build-gcd]
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+      - uses: actions/download-artifact@v4
         with:
-          channel: stable
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.22"
-          cache-dependency-path: core/go.sum
-      - name: Build Flutter Windows
-        working-directory: ui
-        run: |
-          flutter pub get
-          flutter build windows --release
-      - name: Build gcd
+          name: gcd-windows-amd64
+          path: core
+      - name: Extract gcd.exe
         working-directory: core
-        run: go build -trimpath -ldflags="-s -w" -o gcd.exe ./cmd/gcd
+        run: tar -xzf gcd-windows-amd64.tar.gz
+        shell: bash
       - name: Package with Inno Setup
         working-directory: scripts/build
         run: |
           choco install innosetup --no-progress -y
           $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
           ./package-windows.ps1 -Version "${{ github.ref_name }}" -SkipBuild
+      - name: Create portable ZIP
+        working-directory: core
+        run: Compress-Archive -Path gcd.exe -DestinationPath ../scripts/build/dist/Lanos-${{ github.ref_name }}-windows-portable.zip -Force
       - uses: actions/upload-artifact@v4
         with:
-          name: windows-installer
+          name: windows-packages
           path: |
             scripts/build/dist/Lanos-Setup-*.exe
             scripts/build/dist/Lanos-*-portable.zip
 
-  build-macos:
-    name: Build macOS DMG
-    if: false
-    runs-on: macos-13
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          architecture: x64
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.22"
-          cache-dependency-path: core/go.sum
-      - name: Build Flutter macOS
-        working-directory: ui
-        run: flutter build macos --release
-      - name: Build gcd universal
-        working-directory: core
-        run: |
-          GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o gcd-amd64 ./cmd/gcd
-          GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o gcd-arm64 ./cmd/gcd
-          lipo -create -output gcd gcd-amd64 gcd-arm64
-      - name: Package DMG
-        working-directory: scripts/build
-        run: ./package-macos.sh "${{ github.ref_name }}" skip-build
-      - uses: actions/upload-artifact@v4
-        with:
-          name: macos-dmg
-          path: scripts/build/dist/Lanos-*.dmg
-
-  build-linux:
-    name: Build Linux packages
+  package-linux:
+    name: Package Linux
+    needs: [build-gcd]
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+      - uses: actions/download-artifact@v4
         with:
-          channel: stable
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.22"
-          cache-dependency-path: core/go.sum
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libnotify-dev libayatana-appindicator3-dev libfuse2 rpm wget
-
-      - name: Build Flutter Linux
-        working-directory: ui
-        run: |
-          flutter pub get
-          flutter build linux --release
-      - name: Build gcd
+          name: gcd-linux-amd64
+          path: core
+      - name: Extract gcd
         working-directory: core
-        run: CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o gcd ./cmd/gcd
+        run: tar -xzf gcd-linux-amd64.tar.gz
+      - name: Install packaging tools
+        run: sudo apt-get update && sudo apt-get install -y rpm wget
       - name: Package Linux
         working-directory: scripts/build
         run: ./package-linux.sh "${{ github.ref_name }}" skip-build
@@ -141,33 +103,27 @@ jobs:
         with:
           name: linux-packages
           path: |
-            scripts/build/dist/*.AppImage
             scripts/build/dist/*.deb
             scripts/build/dist/*.rpm
 
   release:
     name: Create GitHub Release
-    needs: [build-core, build-windows, build-linux]
+    needs: [build-gcd, package-windows, package-linux]
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
       - name: Assemble release
         run: |
           mkdir -p release
-          # Core binaries
           for f in artifacts/gcd-*/gcd-*.tar.gz; do
             cp "$f" release/
           done
-          # Installers
-          cp artifacts/windows-installer/*.exe release/ 2>/dev/null || true
-          cp artifacts/macos-dmg/*.dmg release/ 2>/dev/null || true
-          cp artifacts/linux-packages/*.AppImage release/ 2>/dev/null || true
+          cp artifacts/windows-packages/*.exe release/ 2>/dev/null || true
+          cp artifacts/windows-packages/*.zip release/ 2>/dev/null || true
           cp artifacts/linux-packages/*.deb release/ 2>/dev/null || true
           cp artifacts/linux-packages/*.rpm release/ 2>/dev/null || true
-          # Checksums
           cd release && sha256sum * > checksums.txt
       - uses: softprops/action-gh-release@v1
         with:
